@@ -179,9 +179,9 @@ CAD_Object* polyhedron(Vec3* points, size_t pointc, Face* faces, size_t facec) {
         scratch_buffer_printf("\n        [");
         for (size_t j = 0; j < faces[i].count; ++j){
             scratch_buffer_printf("%d", faces[i].values[j]);
-            // scratch_buffer_append_double(faces[i].values[j]);
-            if (j < faces[i].count - 1)
+            if (j < faces[i].count - 1) {
                 scratch_buffer_append_char(',');
+            }
         }
         scratch_buffer_append_char(']');
         if (i < facec - 1)
