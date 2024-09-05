@@ -1,12 +1,15 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdarg.h>
 
+double cad_point_size = 1;
+
+// --Scratch buffer
 #define MAX_BUFFER_SIZE 1000000
 
-double cad_point_size = 1;
 
 struct CAD_Scratch_Buf { char str[MAX_BUFFER_SIZE]; size_t len;};
 struct CAD_Scratch_Buf cad_scratch_buffer;
@@ -76,12 +79,14 @@ char *sb_str_copy(void) {
     return str_copy(cad_scratch_buffer.str, cad_scratch_buffer.len + 1);
 }
 
+
+// --Object
+
 typedef struct {
     char* content;
 } CAD_Object;
 
 
-    
 
 CAD_Object* object_printf(const char* format, ...) {
     cad_scratch_buffer.len = 0;
@@ -138,6 +143,74 @@ Vec3 vec3(double x, double y, double z) {
     return vec;
 }
 
+Vec3 vec3_translate(Vec3 vec, double x, double y, double z) {
+    Vec3 new_vec = {
+        .x = vec.x + x,
+        .y = vec.y + y,
+        .z = vec.z + z
+    };
+    return new_vec;
+}
+
+// --array
+typedef struct {
+    size_t count;
+    size_t element_size;
+    void*  values;
+} CAD_Array;
+
+void cad_array_append(CAD_Array* array, void* value) {
+    array->count += 1;
+    array->values = realloc(array->values, array->element_size * array->count);
+    memcpy((char*)array->values + (array->count-1) * array->element_size, value, array->element_size);    
+}
+
+CAD_Array cad_array_concat(CAD_Array a1, CAD_Array a2) {
+    assert(a1.element_size == a2.element_size);
+    CAD_Array ret = {
+        .count = a1.count +  a2.count,
+        .element_size=a1.element_size
+    };
+    ret.values = malloc(ret.element_size * ret.count);
+    memcpy(ret.values, a1.values, a1.element_size * a1.count);
+    memcpy( (char*)ret.values + (a1.element_size * a1.count),
+            a2.values,
+            a2.element_size * a2.count);
+    return ret;
+};
+
+CAD_Array cad_array_reverse(CAD_Array a) {
+    CAD_Array ret = {
+        .count=a.count,
+        .element_size=a.element_size,
+        .values = malloc(a.count * a.element_size)
+    };
+
+    for (size_t i = 0; i < a.count; ++i) {
+        memcpy((char*)ret.values + (ret.count - i - 1) * ret.element_size, 
+               (char*)  a.values + i * a.element_size,
+               a.element_size);
+    }
+    return ret;
+}
+
+#define cad_array_map(array, type, function, ...) ({                            \
+    CAD_Array new_array = {.count=array.count, .element_size=array.element_size};       \
+    new_array.values = (type*)malloc(new_array.count * new_array.element_size);          \
+    type* vals = (type*)array.values;                                                         \
+    for (size_t i=0; i < array.count; ++i) {                                           \
+        type new_value = function(vals[i], __VA_ARGS__); \
+        memcpy((char*)new_array.values + new_array.element_size * i, &new_value, new_array.element_size);                                  \
+    }                                                                                   \
+    new_array;                                                                          \
+})
+
+CAD_Array cad_array_copy(CAD_Array array) {
+    CAD_Array new_array = {.count=array.count, .element_size=array.element_size};
+    new_array.values = malloc(new_array.count * new_array.element_size);
+    return new_array;
+}
+
 #define vectors3(...) ({                        \
     Vec3 temp[] = {__VA_ARGS__};               \
     Vec3* array = (Vec3*)malloc(sizeof(temp)); \
@@ -162,11 +235,6 @@ Vec3 vec3(double x, double y, double z) {
     vecs;                                      \
 })
 
-typedef struct {
-    size_t count;
-    size_t element_size;
-    void*  values;
-} CAD_Array;
 
 #define cad_face(...) ({                     \
     int temp[] = {__VA_ARGS__};              \
@@ -192,29 +260,10 @@ typedef struct {
     faces;                                                \
 })
 
-typedef struct {
-    char* name;
-    char* content;
-} CAD_Program;
-
-CAD_Program* cad_program(char* name) {
-    CAD_Program* p = (CAD_Program*)malloc(sizeof(CAD_Program));
-    p->name = name;
-    p->content = (char*)malloc(sizeof(char));
-    return p;
-}
-
-void cad_program_register(CAD_Program* program, CAD_Object* object) {
-    cad_scratch_buffer.len = 0;
-    sb_printf("%s\n%s\n", program->content, object->content);
-    free(program->content);
-    program->content = sb_str_copy();
-}
-
-int cad_program_save(CAD_Program* program) {
+int cad_program_save(char* name, CAD_Object* program) {
     FILE *program_file;
 
-    program_file = fopen(program->name, "w");
+    program_file = fopen(name, "w");
     if (program_file == NULL) {
         perror("Could not open file.");
         return 1;
@@ -226,7 +275,6 @@ int cad_program_save(CAD_Program* program) {
 
 // Primitives
 // 3D
-
 CAD_Object* cad_cube(double w, double l, double h) {
     return object_printf("cube([%f, %f, %f]);", w, l, h);
 }
@@ -243,7 +291,7 @@ CAD_Object* cad_frustum(double r1, double r2) {
     return object_printf("cylinder(r1=%f, r2=%f, center=true);", r1, r2);
 }
 
-CAD_Object* polyhedron(CAD_Array points, CAD_Array faces) {
+CAD_Object* cad_polyhedron(CAD_Array points, CAD_Array faces) {
     cad_scratch_buffer.len = 0;
     sb_printf("polyhedron(points=[");
 
@@ -311,6 +359,18 @@ CAD_Object* cad_polygon(CAD_Array points) {
 CAD_Object* cad_union(CAD_Object* o1, CAD_Object* o2) {
     return object_printf("union(){\n%s\n%s\n}", o1->content, o2->content);
 }
+
+#define cad_union_multi(...) ({                                  \
+    cad_scratch_buffer.len = 0;                                  \
+    CAD_Object* temp[] = {__VA_ARGS__};                          \
+    sb_printf("union(){\n");                                     \
+    for (size_t i=0; i < sizeof(temp)/sizeof(CAD_Object*); ++i)  \
+        sb_printf(temp[i]->content);                             \
+    sb_printf("}\n");                                            \
+    CAD_Object* newobj = (CAD_Object*)malloc(sizeof(CAD_Object));\
+    newobj->content = sb_str_copy();                             \
+    newobj;                                                      \
+})                                                               
 
 CAD_Object* cad_difference(CAD_Object* o1, CAD_Object* o2) {
     return object_printf("difference(){\n%s\n%s\n}", o1->content, o2->content);

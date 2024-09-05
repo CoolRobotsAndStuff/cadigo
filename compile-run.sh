@@ -1,3 +1,3 @@
 #!/bin/bash
-./compile.sh
-./main
+./compile.sh $1
+./examples/$1

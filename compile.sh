@@ -1,2 +1,2 @@
 #!/bin/bash
-gcc ./main.c -Wall -Wextra -o main 
+gcc ./examples/$1.c -Wall -Wextra -o ./examples/$1 

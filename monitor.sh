@@ -1,1 +1,6 @@
-inotifywait -m . -e modify --include main\.c | while read events; do ./compile-run.sh; echo Reloading!; done
+inotifywait ./examples/ ./ -m -e modify --include .*\.\(c\|h\)\$ |
+while read events
+do
+    ./compile-run.sh $1
+    echo Reloading!
+done
