@@ -1,9 +1,11 @@
+#include <float.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <math.h>
 
 double cad_point_size = 1;
 
@@ -211,6 +213,414 @@ CAD_Array cad_array_copy(CAD_Array array) {
     return new_array;
 }
 
+Vec3 vec3_array_max(CAD_Array array) {
+    Vec3 ret = {.x = -DBL_MAX, .y = -DBL_MAX, .z = -DBL_MAX}; 
+    for (int i = 0; i < (int)array.count; ++i) {
+        Vec3 val = ((Vec3*)array.values)[i];
+        if (val.x > ret.x) ret.x = val.x;
+        if (val.y > ret.y) ret.y = val.y;
+        if (val.z > ret.z) ret.z = val.z;
+    }
+    return ret;
+}
+
+Vec3 vec3_array_min(CAD_Array array) {
+    Vec3 ret = {.x = DBL_MAX, .y = DBL_MAX, .z = DBL_MAX}; 
+    for (int i = 0; i < (int)array.count; ++i) {
+        Vec3 val = ((Vec3*)array.values)[i];
+        if (val.x < ret.x) ret.x = val.x;
+        if (val.y < ret.y) ret.y = val.y;
+        if (val.z < ret.z) ret.z = val.z;
+    }
+    return ret;
+}
+
+Vec2 line_intersection_2d(Vec2 line1_p1, Vec2 line1_p2, Vec2 line2_p1, Vec2 line2_p2) {
+    double a1 = line1_p2.y - line1_p1.y;
+    double b1 = line1_p1.x - line1_p2.x;
+    double c1 = a1*(line1_p1.x) + b1*(line1_p1.y);
+
+    double a2 = line2_p2.y - line2_p1.y;
+    double b2 = line2_p1.x - line2_p2.x;
+    double c2 = a2*(line2_p1.x)+ b2*(line2_p1.y);
+
+    double determinant = a1*b2 - a2*b1;
+    if (determinant == 0) {
+        Vec2 ret = {.x=FLT_MAX, .y=FLT_MAX};
+        return ret;
+    }
+    else {
+        double x = (b2*c1 - b1*c2)/determinant;
+        double y = (a1*c2 - a2*c1)/determinant;
+        Vec2 ret = {.x=x, .y=y};
+        return ret;
+    }
+}
+
+// CAD_Array vec3_array_subdivide(CAD_Array array) {
+//     CAD_Array ret;
+//     Vec3* vals = (Vec3*)array.values;
+//         /*
+//         I wanna smooth this
+//             |
+//             v
+//        p2 ·---· p3
+//          /     \
+//      p1 ·       · p4
+//
+//         So I take the average between this:
+//
+//           ·-x-·
+//          /     \
+//         ·       ·
+//
+//         And this:
+//             x
+//            / \
+//           ·   ·
+//          /     \
+//         ·       ·
+//
+//         and I end up with something like this:
+//             x
+//           ·   ·
+//          /     \
+//         ·       ·
+//
+//         */
+//
+//     Vec3 p1, p2, p3, p4, avg1, avg2, new_p;
+//     for (int i = 0; i < array.count; ++i) {
+//         p1 = vals[(i+0)%array.count];
+//         p2 = vals[(i+1)%array.count];
+//         p3 = vals[(i+2)%array.count];
+//         p4 = vals[(i+3)%array.count];
+//
+//         avg1 = vec3_average(p2, p3);
+//
+//     }
+//     return ret;
+// }
+
+Vec2 vec2_average(Vec2 a, Vec2 b) {
+    Vec2 ret = {.x=(a.x+b.x) / 2, .y=(a.y+b.y) / 2};
+    return ret;
+}
+
+CAD_Array vec2_array_naive_subdivide(CAD_Array array) {
+    CAD_Array ret = {
+        .count = array.count*2,
+        .element_size = array.element_size,
+        .values = malloc(array.element_size * array.count*2)
+    };
+    Vec2* vals = (Vec2*)array.values;
+    Vec2 p1, p2, p3, p4, avg, line_inter, new_p;
+    for (int i = 0; i < (int)array.count; ++i) {
+        int i2 = (i+1)%(int)array.count;
+        p1 = vals[(i+0)%array.count];
+        p2 = vals[(i+1)%array.count];
+        p3 = vals[(i+2)%array.count];
+        p4 = vals[(i+3)%array.count];
+
+        avg = vec2_average(p2, p3);
+        line_inter = line_intersection_2d(p1, p2, p3, p4);
+        if (line_inter.x == FLT_MAX || line_inter.y == FLT_MAX) {
+            line_inter = avg;
+        }
+        new_p = vec2_average(avg, line_inter);
+        ((Vec2*)ret.values)[(i2*2+0)%ret.count] = p2;
+        ((Vec2*)ret.values)[(i2*2+1)%ret.count] = new_p;
+    }
+    return ret;
+}
+
+Vec2 vec2_diff(Vec2 a, Vec2 b) {
+    Vec2 ret = {a.x - b.x, a.y - b.y};
+    return ret;
+}
+
+Vec2 vec2_add(Vec2 a, Vec2 b) {
+    Vec2 ret = {a.x + b.x, a.y + b.y};
+    return ret;
+}
+
+Vec2 vec2_from_angle(double angle) {
+    Vec2 result;
+    result.x = cos(angle);
+    result.y = sin(angle);
+    return result;
+}
+
+double vec2_to_angle(Vec2 vec) {
+    return atan2(vec.y, vec.x);
+}
+
+double angle_diff(double x, double y) {
+    double x1, y1;
+    x1 = x + M_PI; y1 = y + M_PI;
+    return fmin(fabs(x1 - y1), fabs(M_PI - fabs(x1 - y1)));
+}
+
+double vec2_len(Vec2 vec) {
+    return sqrt(vec.x * vec.x + vec.y * vec.y);
+}
+
+Vec2 vec2_scale(Vec2 vec, double factor) {
+    return vec2(vec.x * factor, vec.y * factor);
+}
+
+double vec2_dist(Vec2 a, Vec2 b) {
+    return vec2_len(vec2_diff(a, b));
+}
+
+// --- Swizzling ---
+#define xx(vec) ({vec2(vec.x, vec.x);})
+#define xy(vec) ({vec2(vec.x, vec.y);})
+#define yx(vec) ({vec2(vec.y, vec.x);})
+#define yy(vec) ({vec2(vec.y, vec.y);})
+
+// vec3 only
+#define xz(vec) ({vec2(vec.x, vec.z);})
+#define yz(vec) ({vec2(vec.y, vec.z);})
+#define zx(vec) ({vec2(vec.z, vec.x);})
+#define zy(vec) ({vec2(vec.z, vec.y);})
+#define zz(vec) ({vec2(vec.z, vec.z);})
+
+#define DEFINE__VEC2__ARRAY__SWIZZLE(name, swizzle)                     \
+CAD_Array name(CAD_Array array) {                                       \
+    CAD_Array ret = {                                                   \
+        .count = array.count,                                           \
+        .element_size = sizeof(Vec2),                                   \
+        .values = malloc(array.count * sizeof(Vec2))                    \
+    };                                                                  \
+                                                                        \
+    if (array.element_size == sizeof(Vec2)) {                           \
+        for (size_t i = 0; i < array.count; ++i) {                      \
+            ((Vec2*)ret.values)[i] = swizzle(((Vec2*)array.values)[i]); \
+        }                                                               \
+                                                                        \
+    } else if (array.element_size == sizeof(Vec3)) {                    \
+        for (size_t i = 0; i < array.count; ++i) {                      \
+            ((Vec2*)ret.values)[i] = swizzle(((Vec3*)array.values)[i]); \
+        }                                                               \
+                                                                        \
+    } else {                                                            \
+        perror("Invalid type for array");                               \
+    }                                                                   \
+    return ret; \
+}
+
+#define DEFINE__VEC3__ARRAY__SWIZZLE(name, swizzle)                     \
+CAD_Array name(CAD_Array array) {                                       \
+    CAD_Array ret = {                                                   \
+        .count = array.count,                                           \
+        .element_size = sizeof(Vec2),                                   \
+        .values = malloc(array.count * sizeof(Vec2))                    \
+    };                                                                  \
+    if (array.element_size == sizeof(Vec3)) {                          \
+        for (size_t i = 0; i < array.count; ++i) {                      \
+            ((Vec2*)ret.values)[i] = swizzle(((Vec3*)array.values)[i]); \
+        }                                                               \
+    } else {                                                            \
+        perror("Invalid type for array");                               \
+    }                                                                   \
+    return ret; \
+}
+
+DEFINE__VEC2__ARRAY__SWIZZLE(array_xx, xx);
+DEFINE__VEC2__ARRAY__SWIZZLE(array_xy, xy);
+DEFINE__VEC2__ARRAY__SWIZZLE(array_yx, yx);
+DEFINE__VEC2__ARRAY__SWIZZLE(array_yy, yy);
+
+DEFINE__VEC3__ARRAY__SWIZZLE(array_xz, xz);
+DEFINE__VEC3__ARRAY__SWIZZLE(array_yz, yz);
+DEFINE__VEC3__ARRAY__SWIZZLE(array_zx, zx);
+DEFINE__VEC3__ARRAY__SWIZZLE(array_zy, zy);
+DEFINE__VEC3__ARRAY__SWIZZLE(array_zz, zz);
+
+double hypersqrt(double x) {
+    return sqrt(sqrt(sqrt(sqrt(x))));
+}
+
+CAD_Array vec2_array_blob_subdivide(CAD_Array array) {
+    double max_dist_factor = 0.5;
+    CAD_Array ret = {
+        .count = array.count*2,
+        .element_size = array.element_size,
+        .values = malloc(array.element_size * array.count*2)
+    };
+    Vec2* vals = (Vec2*)array.values;
+    Vec2 p1, p2, p3, p4, perp, avg, new_p;
+    for (int i = 0; i < (int)array.count; ++i) {
+        int i2 = (i+1)%(int)array.count;
+        p1 = vals[(i+0)%array.count];
+        p2 = vals[(i+1)%array.count];
+        p3 = vals[(i+2)%array.count];
+        p4 = vals[(i+3)%array.count];
+
+        avg = vec2_average(p2, p3);
+
+        Vec2 diff = vec2_diff(p2, p3);
+        double angle = vec2_to_angle(diff) + M_PI/2;
+
+        double max_dist = vec2_dist(p2, p3) * max_dist_factor;
+
+        double a1 = vec2_to_angle(vec2_diff(p1, p2));
+        double a2 = vec2_to_angle(vec2_diff(p4, p3));
+        printf("angle_diff: %lf\n", angle_diff(a1, a2) / (M_PI * 2));
+        double a_diff = angle_diff(a1, a2);
+        // double dist = (1 - a_diff / M_PI) * max_dist;
+        // double dist = (1 - (a_diff * a_diff) / (M_PI * M_PI)) * max_dist;
+        double dist = (1 - hypersqrt(a_diff) / hypersqrt(M_PI)) * max_dist;
+
+        printf("dist: %lf\n", dist);
+
+        perp = vec2_add(avg, vec2_scale(vec2_from_angle(angle), dist));
+        new_p = vec2_average(avg, perp);
+        ((Vec2*)ret.values)[(i2*2+0)%ret.count] = p2;
+        ((Vec2*)ret.values)[(i2*2+1)%ret.count] = new_p;
+    }
+    return ret;
+}
+
+
+CAD_Array vec2_array_subdivide(CAD_Array array) {
+    const double F = 1.0;
+    int j0, j1;
+    int n_points = (int)array.count;
+    Vec2* points_input = (Vec2*)array.values;
+
+    CAD_Array ret = {
+        .count = array.count * 2,
+        .element_size = array.element_size,
+        .values = malloc(array.count * 2 * array.element_size)
+    };
+    Vec2 p1, p2, q1, q2;
+    int k = 0;
+    for (int j=0; j < n_points; ++j) {
+        j0 = (j+0 + n_points) % n_points; // circular form
+        j1 = (j+1 + n_points) % n_points;
+
+        p1.x = points_input[j0].x;
+        p1.y = points_input[j0].y;
+
+        p2.x = points_input[j1].x;
+        p2.y = points_input[j1].y;
+
+        double dx = p2.x - p1.x;
+        double dy = p2.y - p1.y;
+
+        double radiX = dx / 2.82843; // 2 * 2^0.5 = 2.82843
+        double radiY = dy / 2.82843; //
+
+        double ox = (p1.x + p2.x) / 2.0;
+        double oy = (p1.y + p2.y) / 2.0;
+
+        q1.x = ox - F * radiX / 1.41421; // sqrt(2) = 1.41421
+        q1.y = oy - F * radiY / 1.41421;
+        ((Vec2*)ret.values)[k] = q1; k = k + 1;
+
+        q2.x = ox + F * radiX / 1.41421;
+        q2.y = oy + F * radiY / 1.41421;
+        ((Vec2*)ret.values)[k] = q2; 
+
+        k = k + 1;
+    }
+    return ret;
+}
+
+CAD_Array vec3_array_scale(Vec3 scale, CAD_Array array) {
+    CAD_Array ret = {
+        .count = array.count,
+        .element_size = array.element_size,
+        .values = malloc(array.element_size * array.count)
+    };
+
+    Vec3* vals = (Vec3*)(array.values);
+    for (size_t i = 0; i < ret.count; ++i) {
+        ((Vec3*)ret.values)[i] = vec3(
+            (vals[i].x * scale.x),
+            (vals[i].y * scale.y),
+            (vals[i].z * scale.z)
+        );
+    }
+
+    return ret;
+}
+
+double average(double x, double y) {
+    return (x + y) / 2;
+}
+
+CAD_Array vec3_array_subdivide(CAD_Array array) {
+    CAD_Array ret = {
+        .count = array.count * 2,
+        .element_size = array.element_size,
+        .values = malloc(array.element_size * array.count * 2)
+    };
+
+    Vec2* smooth_xy_array = (Vec2*)vec2_array_subdivide(array_xy(array)).values;
+    Vec2* smooth_yz_array = (Vec2*)vec2_array_subdivide(array_yz(array)).values;
+    Vec2* smooth_xz_array = (Vec2*)vec2_array_subdivide(array_xz(array)).values;
+    
+    for (size_t i = 0; i < ret.count; ++i) {
+        ((Vec3*)ret.values)[i] = vec3(
+            average(smooth_xy_array[i].x, smooth_xz_array[i].x),
+            average(smooth_xy_array[i].y, smooth_yz_array[i].x),
+            average(smooth_yz_array[i].y, smooth_xz_array[i].y)
+        );
+    }
+    return ret;
+}
+
+
+// CAD_Array array_xy(CAD_Array array) {
+//     CAD_Array ret = {
+//         .count = array.count,
+//         .element_size = sizeof(Vec2),
+//         .values = malloc(array.count * sizeof(Vec2))
+//     };
+//
+//     if (array.element_size == sizeof(Vec2)) {
+//         for (size_t i = 0; i < array.count; ++i) {
+//             ((Vec2*)ret.values)[i] = xy(((Vec2*)array.values)[i]);
+//         }
+//
+//     } else if (array.element_size == sizeof(Vec3)) {
+//         for (size_t i = 0; i < array.count; ++i) {
+//             ((Vec2*)ret.values)[i] = xy(((Vec3*)array.values)[i]);
+//         }
+//
+//     } else {
+//         perror("Invalid type for array");
+//     }
+// }
+
+
+
+double cad_array_max(CAD_Array array) {
+    double ret = -DBL_MAX; 
+    double* vals = (double*)array.values;
+    for (int i = 0; i < (int)array.count; ++i) {
+        if (vals[i] > ret) {
+            ret = vals[i]; 
+        }
+    }
+    return ret;
+}
+
+double cad_array_min(CAD_Array array) {
+    double ret = -DBL_MAX; 
+    double* vals = (double*)array.values;
+    for (int i = 0; i < (int)array.count; ++i) {
+        if (vals[i] < ret) {
+            ret = vals[i]; 
+        }
+    }
+    return ret;
+}
+
+
 #define vectors3(...) ({                        \
     Vec3 temp[] = {__VA_ARGS__};               \
     Vec3* array = (Vec3*)malloc(sizeof(temp)); \
@@ -260,7 +670,7 @@ CAD_Array cad_array_copy(CAD_Array array) {
     faces;                                                \
 })
 
-int cad_program_save(char* name, CAD_Object* program) {
+int cad_program_save(char* name, CAD_Object* program, int fn) {
     FILE *program_file;
 
     program_file = fopen(name, "w");
@@ -268,7 +678,7 @@ int cad_program_save(char* name, CAD_Object* program) {
         perror("Could not open file.");
         return 1;
     }
-    fprintf(program_file, "%s\n", program->content);
+    fprintf(program_file, "$fn=%d;\n%s\n", fn, program->content);
     fclose(program_file);
     return 0;
 }
@@ -385,28 +795,32 @@ CAD_Object* cad_minkowski(CAD_Object* o1, CAD_Object* o2) {
 }
 
 // Modifying Operations
-void cad_translate(CAD_Object* object, double x, double y, double z) {
+CAD_Object* cad_translate(CAD_Object* object, double x, double y, double z) {
     object_modify_printf(object, "translate([%f, %f, %f])\n%s", x, y, z, object->content);
+    return object;
 }
 
-void cad_resize(CAD_Object* object, double x, double y, double z) {
+CAD_Object* cad_resize(double x, double y, double z, CAD_Object* object) {
     object_modify_printf(object, "resize([%f, %f, %f])\n%s", x, y, z, object->content);
+    return object;
 }
 
 void cad_scale(CAD_Object* object, double x, double y, double z) {
     object_modify_printf(object, "scale([%f, %f, %f])\n%s", x, y, z, object->content);
 }
 
-void cad_rotate(CAD_Object* object, double x, double y, double z) {
+CAD_Object* cad_rotate(CAD_Object* object, double x, double y, double z) {
     object_modify_printf(object, "rotate([%f, %f, %f])\n%s", x, y, z, object->content);
+    return object;
 }
 
 void cad_resize2D(CAD_Object* object, double x, double y) {
     object_modify_printf(object, "resize([%f, %f])\n%s", x, y,object->content);
 }
 
-void cad_extrude(CAD_Object* object, double h) {
+CAD_Object* cad_extrude(CAD_Object* object, double h) {
     object_modify_printf(object, "linear_extrude(height=%f)\n%s", h, object->content);
+    return object;
 }
 
 // Utils
