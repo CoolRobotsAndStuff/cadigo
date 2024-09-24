@@ -207,7 +207,7 @@ CAD_Array cad_array_reverse(CAD_Array a) {
     new_array;                                                                          \
 })
 
-CAD_Array cad_array_copy(CAD_Array array) {
+CAD_Array cad_array_new_empty_like(CAD_Array array) {
     CAD_Array new_array = {.count=array.count, .element_size=array.element_size};
     new_array.values = malloc(new_array.count * new_array.element_size);
     return new_array;
@@ -374,17 +374,17 @@ double vec2_dist(Vec2 a, Vec2 b) {
 }
 
 // --- Swizzling ---
-#define xx(vec) ({vec2(vec.x, vec.x);})
-#define xy(vec) ({vec2(vec.x, vec.y);})
-#define yx(vec) ({vec2(vec.y, vec.x);})
-#define yy(vec) ({vec2(vec.y, vec.y);})
+#define xx(vec) (vec2(vec.x, vec.x))
+#define xy(vec) (vec2(vec.x, vec.y))
+#define yx(vec) (vec2(vec.y, vec.x))
+#define yy(vec) (vec2(vec.y, vec.y))
 
 // vec3 only
-#define xz(vec) ({vec2(vec.x, vec.z);})
-#define yz(vec) ({vec2(vec.y, vec.z);})
-#define zx(vec) ({vec2(vec.z, vec.x);})
-#define zy(vec) ({vec2(vec.z, vec.y);})
-#define zz(vec) ({vec2(vec.z, vec.z);})
+#define xz(vec) (vec2(vec.x, vec.z))
+#define yz(vec) (vec2(vec.y, vec.z))
+#define zx(vec) (vec2(vec.z, vec.x))
+#define zy(vec) (vec2(vec.z, vec.y))
+#define zz(vec) (vec2(vec.z, vec.z))
 
 #define DEFINE__VEC2__ARRAY__SWIZZLE(name, swizzle)                     \
 CAD_Array name(CAD_Array array) {                                       \
@@ -621,19 +621,22 @@ double cad_array_min(CAD_Array array) {
 }
 
 
-#define vectors3(...) ({                        \
-    Vec3 temp[] = {__VA_ARGS__};               \
-    Vec3* array = (Vec3*)malloc(sizeof(temp)); \
-    memcpy(array, temp, sizeof(temp));         \
-    CAD_Array vecs = {                         \
-        .count = sizeof(temp)/sizeof(Vec3),    \
-        .element_size = sizeof(Vec3),          \
-        .values = array                        \
-    };                                         \
-    vecs;                                      \
-})
+#define vectors3(...)  \
+    vector3__array(sizeof((Vec3[]){__VA_ARGS__}), (Vec3[]){__VA_ARGS__}) 
 
-#define vectors2(...) ({                        \
+CAD_Array vector3__array(size_t size, Vec3* ptr){
+    void* array = malloc(size);
+    memcpy(array, ptr, size);
+
+    return (CAD_Array) {
+        .count = size / sizeof(Vec3),
+        .element_size = sizeof(Vec3),
+        .values = array
+    };
+}
+
+
+#define vectors2(...) ({                       \
     Vec2 temp[] = {__VA_ARGS__};               \
     Vec2* array = (Vec2*)malloc(sizeof(temp)); \
     memcpy(array, temp, sizeof(temp));         \
@@ -670,7 +673,7 @@ double cad_array_min(CAD_Array array) {
     faces;                                                \
 })
 
-int cad_program_save(char* name, CAD_Object* program, int fn) {
+int cad_program_save(char* name, CAD_Object* program, double fs) {
     FILE *program_file;
 
     program_file = fopen(name, "w");
@@ -678,7 +681,7 @@ int cad_program_save(char* name, CAD_Object* program, int fn) {
         perror("Could not open file.");
         return 1;
     }
-    fprintf(program_file, "$fn=%d;\n%s\n", fn, program->content);
+    fprintf(program_file, "$fs=%lf;\n%s\n", fs, program->content);
     fclose(program_file);
     return 0;
 }
@@ -706,12 +709,7 @@ CAD_Object* cad_polyhedron(CAD_Array points, CAD_Array faces) {
     sb_printf("polyhedron(points=[");
 
     Vec3* v = (Vec3*)points.values;
-    printf("hello2: %f\n", v[2].y);
     for (size_t i = 0; i < points.count; ++i){
-        printf("\n        [%f, %f, %f],",
-                              v[i].x, 
-                              v[i].y, 
-                              v[i].z);
         sb_printf("\n        [%f, %f, %f],",
                               v[i].x, 
                               v[i].y, 
@@ -745,6 +743,10 @@ CAD_Object* cad_polyhedron(CAD_Array points, CAD_Array faces) {
 
 CAD_Object* cad_circle(double radius) {
     return object_printf("circle(r=%f);", radius);
+}
+
+CAD_Object* cad_square(double x, double y) {
+    return object_printf("square([%lf, %lf]);", x, y);
 }
 
 CAD_Object* cad_polygon(CAD_Array points) {
@@ -783,19 +785,23 @@ CAD_Object* cad_union(CAD_Object* o1, CAD_Object* o2) {
 })                                                               
 
 CAD_Object* cad_difference(CAD_Object* o1, CAD_Object* o2) {
-    return object_printf("difference(){\n%s\n%s\n}", o1->content, o2->content);
+    return object_printf("difference(){\n%s\n%s\n}\n", o1->content, o2->content);
 }
 
 CAD_Object* cad_intersection(CAD_Object* o1, CAD_Object* o2) {
-    return object_printf("intersection(){\n%s\n%s\n}", o1->content, o2->content);
+    return object_printf("intersection(){\n%s\n%s\n}\n", o1->content, o2->content);
 }
 
 CAD_Object* cad_minkowski(CAD_Object* o1, CAD_Object* o2) {
-    return object_printf("minkowski(){\n%s\n%s\n}", o1->content, o2->content);
+    return object_printf("minkowski(){\n%s\n%s\n}\n", o1->content, o2->content);
+}
+
+CAD_Object* cad_mirror(int x, int y, int z, CAD_Object* o1) {
+    return object_printf("mirror([%d, %d, %d])\n%s", x, y, z, o1->content);
 }
 
 // Modifying Operations
-CAD_Object* cad_translate(CAD_Object* object, double x, double y, double z) {
+CAD_Object* cad_translate(double x, double y, double z, CAD_Object* object) {
     object_modify_printf(object, "translate([%f, %f, %f])\n%s", x, y, z, object->content);
     return object;
 }
@@ -805,8 +811,14 @@ CAD_Object* cad_resize(double x, double y, double z, CAD_Object* object) {
     return object;
 }
 
-void cad_scale(CAD_Object* object, double x, double y, double z) {
+CAD_Object* cad_scale(CAD_Object* object, double x, double y, double z) {
     object_modify_printf(object, "scale([%f, %f, %f])\n%s", x, y, z, object->content);
+    return object;
+}
+
+CAD_Object* cad_scale_centered(CAD_Object* object, double x, double y, double z) {
+    object_modify_printf(object, "scale([%f, %f, %f])\n%s", x, y, z, object->content);
+    return object;
 }
 
 CAD_Object* cad_rotate(CAD_Object* object, double x, double y, double z) {
@@ -814,8 +826,9 @@ CAD_Object* cad_rotate(CAD_Object* object, double x, double y, double z) {
     return object;
 }
 
-void cad_resize2D(CAD_Object* object, double x, double y) {
+CAD_Object* cad_resize2D(CAD_Object* object, double x, double y) {
     object_modify_printf(object, "resize([%f, %f])\n%s", x, y,object->content);
+    return object;
 }
 
 CAD_Object* cad_extrude(CAD_Object* object, double h) {
@@ -825,6 +838,28 @@ CAD_Object* cad_extrude(CAD_Object* object, double h) {
 
 // Utils
 
+Vec3 vec3_array_bounds_size(CAD_Array array) {
+    Vec3 max_point = vec3_array_max(array);
+    Vec3 min_point = vec3_array_min(array);
+    return vec3(
+        max_point.x - min_point.x,
+        max_point.y - min_point.y,
+        max_point.z - min_point.z
+    );
+}
+
+Vec3 vec3_div(Vec3 a, Vec3 b) {
+    return vec3(a.x / b.x, a.y / b.y, a.z / b.z);
+}
+
+Vec3 vec3_sub(Vec3 a, Vec3 b) {
+    return vec3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+CAD_Array vec3_array_center(CAD_Array array) {
+    Vec3 offset = vec3_div(vec3_array_bounds_size(array), vec3(2, 2, 2));
+    return cad_array_map(array, Vec3, vec3_sub, offset);
+}
 
 CAD_Object* cad_object_copy(CAD_Object* object) {
     CAD_Object* new_object = (CAD_Object*)malloc(sizeof(CAD_Object));
@@ -833,8 +868,6 @@ CAD_Object* cad_object_copy(CAD_Object* object) {
 }
 
 CAD_Object* cad_reference_point(double x, double y, double z) {
-    CAD_Object* s = cad_sphere(cad_point_size);
-    cad_translate(s, x, y, z);
-    return s;
+    return cad_translate(x, y, z, cad_sphere(cad_point_size));
 }
 
