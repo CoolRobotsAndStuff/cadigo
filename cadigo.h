@@ -772,6 +772,10 @@ CAD_Object* cad_union(CAD_Object* o1, CAD_Object* o2) {
     return object_printf("union(){\n%s\n%s\n}", o1->content, o2->content);
 }
 
+void cad_add(CAD_Object* o1, CAD_Object* o2) {
+    o1->content = cad_union(o1, o2)->content;
+}
+
 #define cad_union_multi(...) ({                                  \
     cad_scratch_buffer.len = 0;                                  \
     CAD_Object* temp[] = {__VA_ARGS__};                          \
@@ -811,7 +815,12 @@ CAD_Object* cad_resize(double x, double y, double z, CAD_Object* object) {
     return object;
 }
 
-CAD_Object* cad_scale(CAD_Object* object, double x, double y, double z) {
+CAD_Object* cad_resize_v(Vec3 v, CAD_Object* object) {
+    object_modify_printf(object, "resize([%f, %f, %f])\n%s", v.x, v.y, v.z, object->content);
+    return object;
+}
+
+CAD_Object* cad_scale(double x, double y, double z, CAD_Object* object) {
     object_modify_printf(object, "scale([%f, %f, %f])\n%s", x, y, z, object->content);
     return object;
 }
@@ -821,17 +830,17 @@ CAD_Object* cad_scale_centered(CAD_Object* object, double x, double y, double z)
     return object;
 }
 
-CAD_Object* cad_rotate(CAD_Object* object, double x, double y, double z) {
+CAD_Object* cad_rotate(double x, double y, double z, CAD_Object* object) {
     object_modify_printf(object, "rotate([%f, %f, %f])\n%s", x, y, z, object->content);
     return object;
 }
 
-CAD_Object* cad_resize2D(CAD_Object* object, double x, double y) {
+CAD_Object* cad_resize2D(double x, double y, CAD_Object* object) {
     object_modify_printf(object, "resize([%f, %f])\n%s", x, y,object->content);
     return object;
 }
 
-CAD_Object* cad_extrude(CAD_Object* object, double h) {
+CAD_Object* cad_extrude(double h, CAD_Object* object) {
     object_modify_printf(object, "linear_extrude(height=%f)\n%s", h, object->content);
     return object;
 }

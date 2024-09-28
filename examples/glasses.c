@@ -1,5 +1,4 @@
 #include "../cadigo.h"
-#include <bits/pthreadtypes.h>
 #include <stdio.h>
 
 CAD_Array range(size_t beg, size_t end, size_t step) {
@@ -134,53 +133,58 @@ CAD_Object* flat_lenses(double height) {
     return cad_object_extrude(points, height);
 };
 
-CAD_Object* arch(double x, double y, double z, double thickness) {
+CAD_Object* outer_arch(double x, double y, double z, double thickness) {
     return
-        cad_extrude(
+        cad_extrude(z,
             cad_intersection(
                 cad_difference(
-                    cad_resize2D(cad_circle(10), x, y*2),
+                    cad_resize2D(x, y*2, cad_circle(10)),
                     cad_resize2D(
-                        cad_circle(10),
                         x - thickness *2, 
-                        y*2 - thickness*2
+                        y*2 - thickness*2,
+                        cad_circle(10)
                     )
                 ),
                 cad_translate(-x/2, 0, 0,
                     cad_square(x, y)
                 )
+            )
+        );
+}
+
+CAD_Object* inner_arch(double x, double y, double z, double thickness) {
+    return
+        cad_extrude(z,
+        cad_intersection(
+            cad_difference(
+                cad_resize2D(x+thickness*2, y*2+thickness*2, cad_circle(10)),
+                cad_resize2D(x, y*2, cad_circle(10))
             ),
-            z
+            cad_translate(-(x + thickness*2)/2, 0, 0,
+                cad_square(x + thickness*2, y + thickness*2)
+            )
+        )
         );
 }
 
 int main() {
     CAD_Object* lens1 =
         cad_translate(-35, 0, 0,
-            cad_rotate(
-                cad_union(
-                    lens(), 
-                    cad_translate(0, 0, -15,
-                        cad_scale(
-                            flat_lenses(30),
-                            0.95, 0.95, 1
-                        )
-                    )
-                ),
-            0, -6, -6)
-        );
+        cad_rotate(0, -6, -6,
+        cad_union(
+            lens(), 
+            cad_translate(0, 0, -15,
+            cad_scale(0.95, 0.95, 1,
+                flat_lenses(30)
+            ))
+        )));
     
     CAD_Object* frame1 =
         cad_translate(-35, 0, 0,
-            cad_rotate(
-                cad_translate(0, 0, -10,
-                    cad_scale(
-                        flat_lenses(20),
-                        1, 1, 1
-                    )
-                ),
-            0, -6, -6)
-        );
+        cad_rotate(0, -6, -6,
+        cad_translate(0, 0, -10,
+            flat_lenses(20)
+        )));
 
     CAD_Object* lens2  = cad_mirror(1, 0, 0, lens1);
     CAD_Object* frame2 = cad_mirror(1, 0, 0, frame1);
@@ -193,13 +197,16 @@ int main() {
     double curve_x = 200;
     double curve_y = 30;
 
-    CAD_Object* curve = arch(
+    CAD_Object* curve = outer_arch(
         curve_x, 
         curve_y, 
         100, 
         glasses_thickness);
 
-    cad_rotate(curve, 90, 0, 0);
+    cad_rotate(90, 0, 0, curve);
+    cad_translate(0, 30, -curve_y + 3.5, curve);
+
+    cad_rotate(90, 0, 0, curve);
     cad_translate(0, 30, -curve_y + 3.5, curve);
 
 
@@ -225,7 +232,7 @@ int main() {
                         cad_cube(80, 6.1, 20)
                     ),
                     cad_translate(0, 6, -10,
-                        arch(28.5, 13, 20, 5)
+                        outer_arch(28.5, 13, 20, 5)
                     )
                 )
             )
