@@ -74,6 +74,17 @@ Vec3 vec3_rotate_y(val rotation, Vec3 p) {
     return v3(cos(angle)*mag, p.y, sin(angle)*mag);
 }
 
+Vec3 vec3_rotate_x(val rotation, Vec3 p) {
+    double angle = atan2(p.z, p.y) + rotation;
+    double mag = sqrt(p.y*p.y + p.z*p.z);
+    return v3(p.x, cos(angle)*mag, sin(angle)*mag);
+}
+
+Vec3 vec3_rotate_z(val rotation, Vec3 p) {
+    double angle = atan2(p.z, p.x) + rotation;
+    double mag = sqrt(p.x*p.x + p.z*p.z);
+    return v3(cos(angle)*mag, p.y, sin(angle)*mag);
+}
 
 typedef struct {
     size_t count;

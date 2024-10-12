@@ -16,13 +16,14 @@ typedef struct {
 
 static Vec2 project_3d_2d(Vec3 v, Camera* camera) {
     Vec3 v1 = v;
+    
+    v1 = vec3_rotate_y(camera->rotation.y, v1);
+    v1 = vec3_rotate_x(camera->rotation.x, v1);
+
     v1 = vec3_substract(v1, camera->position);
-    v1 = vec3_rotate_y (camera->rotation.y, v1);
-    v1.z *= camera->zoom;
 
     return v2(v1.x/v1.z, v1.y/v1.z);
 }
-
 static Vec2 project_2d_scr(Vec2 v) {
     return v2((v.x + 1)/2*WINDOW_WIDTH/8 + WINDOW_WIDTH/2., (1 - (v.y + 1)/2)*WINDOW_WIDTH/8 + WINDOW_WIDTH/2.);
 }
@@ -30,7 +31,7 @@ static Vec2 project_2d_scr(Vec2 v) {
 #define NSPF 100000000 / 2
 
 #define SENSITIVITY 500000000. / NSPF
-#define SENSITIVITY_ROT 0.01
+#define SENSITIVITY_ROT 0.1
 
 int main(void) {
     SDL_Event event;
@@ -99,13 +100,20 @@ int main(void) {
                 }
             }
         }
-
-        if (moving_up)       cam.position.y -= SENSITIVITY;
-        if (moving_down)     cam.position.y += SENSITIVITY;
-        if (moving_left)     cam.position.x += SENSITIVITY;
-        if (moving_right)    cam.position.x -= SENSITIVITY;
-        if (moving_forward)  cam.position.z += SENSITIVITY;
-        if (moving_backward) cam.position.z -= SENSITIVITY;
+        
+        if (!shifting){
+            if (moving_up)       cam.position.y += SENSITIVITY;
+            if (moving_down)     cam.position.y -= SENSITIVITY;
+            if (moving_left)     cam.position.x -= SENSITIVITY;
+            if (moving_right)    cam.position.x += SENSITIVITY;
+            if (moving_forward)  cam.position.z -= SENSITIVITY;
+            if (moving_backward) cam.position.z += SENSITIVITY;
+        } else {
+            if (moving_left)     cam.rotation.y += SENSITIVITY_ROT;
+            if (moving_right)    cam.rotation.y -= SENSITIVITY_ROT;
+            if (moving_up)       cam.rotation.x -= SENSITIVITY_ROT;
+            if (moving_down)     cam.rotation.x += SENSITIVITY_ROT;
+        }
 
         Object3D c = obj_cube(10);
         for (size_t i = 0; i < c.points.count; ++i) {
