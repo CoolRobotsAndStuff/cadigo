@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#define STB_DS_IMPLEMENTATION
+#include "stb_ds.h"
+
 typedef long double val;
 #define VAL_SIZE_BITS (sizeof(val)*8)
 #define VAL_FMT "%LF"
@@ -223,17 +226,39 @@ Object3D obj_cube(val size) {
             v3(-a, -a, -a),
             v3(-a, -a,  a),
             v3(-a,  a,  a),
-            v3( a,  a,  a),
-
             v3(-a,  a, -a),
-            v3( a, -a,  a),
-            v3( a,  a, -a),
+
             v3( a, -a, -a),
+            v3( a, -a,  a),
+            v3( a,  a,  a),
+            v3( a,  a, -a),
+        ),
+        .faces = faces(
+            // Each pair are opposites
+            face(0, 1, 2, 3),
+            face(4, 5, 6, 7),
+
+            face(0, 1, 5, 4),
+            face(2, 3, 7, 6),
+
+            face(1, 2, 6, 5),
+            face(4, 0, 3, 7)
         )
     };
     return c;
 }
 
+
+size_t add_vertex_to(Object3D* obj, Vec3 point) {
+    Vec3* new_points = (Vec3*)malloc(sizeof(Vec3) * (obj->points.count + 1));
+    memcpy(new_points, obj->points.items, sizeof(Vec3) * obj->points.count);
+    free(obj->points.items);
+
+    obj->points.items = new_points;
+    obj->points.count += 1;
+    obj->points.items[obj->points.count - 1] = point;
+    return obj->points.count - 1; 
+}
 
 
 

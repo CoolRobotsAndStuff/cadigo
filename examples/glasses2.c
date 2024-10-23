@@ -43,6 +43,8 @@ void make_little_faces_around(CAD_Array* faces) {
 CAD_Object* cad_object_extrude(CAD_Array points, double h) {
     CAD_Array second_face = cad_array_map(points, Vec3, vec3_translate, 0, 0, h);
 
+    points = vec3_array_subdivide(points);
+
     points = cad_array_concat(points, second_face);
 
     CAD_Array faces = cad_faces(
@@ -51,6 +53,8 @@ CAD_Object* cad_object_extrude(CAD_Array points, double h) {
     );
 
     make_little_faces_around(&faces);
+    
+
     return cad_polyhedron(points, faces);
 }
 
@@ -101,7 +105,7 @@ CAD_Array lens_shape() {
     
     points = vec3_array_center(points);
     points = vec3_array_scale(vec3(1, 1, 0.7), points);
-    points = vec3_array_subdivide(points);
+    // points = vec3_array_subdivide(points);
     return points;
 }
 
@@ -221,7 +225,7 @@ CAD_Object* temple() {
 
 int main() {
     CAD_Array points = lens_shape();
-    CAD_Object* lens_shape = cad_object_extrude(points, 0.2);
+    CAD_Object* lens_shape = cad_object_extrude(points, LENS_THICKNESS);
 
     Vec3 lens_size = vec3_array_bounds_size(points);
     lens_size.z += LENS_THICKNESS;
@@ -287,20 +291,24 @@ int main() {
                 cad_cube(bridge_width, bridge_y_level, MAX_HEIGHT/2)
             )
         );
+    
+    positive = cad_union(frame2, frame1);
 
-    positive =
-        cad_union(
-            positive,
-            cad_translate(0, lens_size.y/2-.2+3-bridge_y_level, -OFFSET/2,
+    CAD_Object* bridge = cad_translate(0, lens_size.y/2-.2+3-bridge_y_level, -OFFSET/2,
                 inner_arch(SEPARATION + (bridge_y_level - 10)*0.38, BRIDGE_NOSE_HEIGHT, MAX_HEIGHT/2, 0.5, 15)
-            )
-        );
+            );
+
+    positive = cad_intersection(positive, curve);
+    positive = cad_minkowski(positive, cad_sphere(1));
+
+    bridge = cad_intersection(bridge, curve);
+    bridge = cad_minkowski(bridge, cad_sphere(1));
+
+    //positive = cad_union(positive, bridge);
 
     CAD_Object* negative = cad_union_multi(lens1, lens2);
 
 
-    positive = cad_intersection(positive, curve);
-    positive = cad_minkowski(positive, cad_sphere(1));
 
     CAD_Object* lenses = cad_difference(positive, negative);
 
@@ -312,7 +320,7 @@ int main() {
     CAD_Object* t2 = cad_mirror(1, 0, 0, t);
 
     cad_program_save("examples/glasses.scad", 
-                     cad_union_multi(lenses, t, t2),
+                     lens_shape,
                      2.1);
 
 

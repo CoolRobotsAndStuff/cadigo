@@ -88,6 +88,52 @@ typedef struct {
     char* content;
 } CAD_Object;
 
+typedef struct {
+    double x;
+    double y;
+} Vec2;
+
+Vec2 vec2(double x, double y) {
+    Vec2 vec = {.x = x, .y = y};
+    return vec;
+}
+
+typedef struct {
+    double x;
+    double y;
+    double z;
+} Vec3;
+
+Vec3 vec3(double x, double y, double z) {
+    Vec3 vec = {.x = x, .y = y, .z = z};
+    return vec;
+}
+
+Vec3 vec3_translate(Vec3 vec, double x, double y, double z) {
+    return vec3(vec.x + x, vec.y + y, vec.z + z);
+}
+
+typedef struct {
+    size_t count;
+    Vec3*  items;
+} Points;
+
+typedef struct {
+    size_t  count;
+    size_t* items;
+} Face;
+
+typedef struct {
+    size_t count;
+    Face*  items;
+} Faces;
+
+typedef struct {
+    Points points;
+    Faces  faces;
+} CAD;
+
+
 
 
 CAD_Object* object_printf(const char* format, ...) {
@@ -122,36 +168,6 @@ void object_modify_printf(CAD_Object* object, const char* format, ...) {
 
     free(object->content);
     object->content = sb_str_copy();
-}
-
-typedef struct {
-    double x;
-    double y;
-} Vec2;
-
-Vec2 vec2(double x, double y) {
-    Vec2 vec = {.x = x, .y = y};
-    return vec;
-}
-
-typedef struct {
-    double x;
-    double y;
-    double z;
-} Vec3;
-
-Vec3 vec3(double x, double y, double z) {
-    Vec3 vec = {.x = x, .y = y, .z = z};
-    return vec;
-}
-
-Vec3 vec3_translate(Vec3 vec, double x, double y, double z) {
-    Vec3 new_vec = {
-        .x = vec.x + x,
-        .y = vec.y + y,
-        .z = vec.z + z
-    };
-    return new_vec;
 }
 
 // --array
@@ -304,6 +320,26 @@ Vec2 line_intersection_2d(Vec2 line1_p1, Vec2 line1_p2, Vec2 line2_p1, Vec2 line
 
 Vec2 vec2_average(Vec2 a, Vec2 b) {
     Vec2 ret = {.x=(a.x+b.x) / 2, .y=(a.y+b.y) / 2};
+    return ret;
+}
+
+CAD_Array vec2_array_dummy_subdivide(CAD_Array array) {
+    CAD_Array ret = {
+        .count = array.count*2,
+        .element_size = array.element_size,
+        .values = malloc(array.element_size * array.count*2)
+    };
+    Vec2* vals = (Vec2*)array.values;
+    Vec2 p1, p2, avg;
+    for (int i = 0; i < (int)array.count; ++i) {
+        int i2 = (i+1)%(int)array.count;
+        p1 = vals[(i+0)%array.count];
+        p2 = vals[(i+1)%array.count];
+
+        avg = vec2_average(p1, p2);
+        ((Vec2*)ret.values)[(i2*2+0)%ret.count] = p1;
+        ((Vec2*)ret.values)[(i2*2+1)%ret.count] = avg;
+    }
     return ret;
 }
 
@@ -548,6 +584,7 @@ CAD_Array vec3_array_scale(Vec3 scale, CAD_Array array) {
     return ret;
 }
 
+
 double average(double x, double y) {
     return (x + y) / 2;
 }
@@ -562,6 +599,8 @@ CAD_Array vec3_array_subdivide(CAD_Array array) {
     Vec2* smooth_xy_array = (Vec2*)vec2_array_subdivide(array_xy(array)).values;
     Vec2* smooth_yz_array = (Vec2*)vec2_array_subdivide(array_yz(array)).values;
     Vec2* smooth_xz_array = (Vec2*)vec2_array_subdivide(array_xz(array)).values;
+
+    printf("%ld\n", array_xy(array).count);
     
     for (size_t i = 0; i < ret.count; ++i) {
         ((Vec3*)ret.values)[i] = vec3(

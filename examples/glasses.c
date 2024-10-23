@@ -102,7 +102,7 @@ CAD_Array lens_shape() {
     
     points = vec3_array_center(points);
     points = vec3_array_scale(vec3(1, 1, 0.7), points);
-    points = vec3_array_subdivide(points);
+    // points = vec3_array_subdivide(points);
     return points;
 }
 
