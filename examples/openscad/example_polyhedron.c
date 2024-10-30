@@ -6,8 +6,7 @@
 #include <stdio.h>
 
 int main() {
-    CAD c = cad_catmull_clark(cad_cube(3));
-
+    CAD c = cad_catmull_clark(cad_catmull_clark(cad_catmull_clark(cad_cube(3))));
 
     FILE *program_file;
     program_file = fopen("examples/openscad/example_polyhedron.scad", "w");

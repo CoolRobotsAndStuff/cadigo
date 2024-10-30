@@ -4,10 +4,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdbool.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458700660631558817488152092096282925409171536436789259036001133053054882046652138414695194151160943305727036575959195309218611738193261179310511854807446237996274956735188575272489122793818301194912983367336244065664308602139494639522473719070217986094370277053921717629317675238467481846766940513200056812714526356082778577134275778960917363717872146844090122495343014654958537105079227968925892354201995611212902196086403441815981362977477130996051870721134999999837297804995105973173281609631859502445945534690830264252230825334468503526193118817101000313783875288658753320838142061717766914730359825349042875546873115956286388235378759375195778185778053217122680661300192787661119590921642019893809525720106548586327886593615338182796823030195203530185296899577362259941389124972177528347913151557485724245415069595082953311686172785588907509838175463746493931925506040092770167113900984882401285836160356370766010471018194295559619894676783744944825537977472684710404753464620804668425906949129331367702898915210475216205696602405803815019351125338243003558764024749647326391419927260426992279678235478163600934172164121992458631503028618297455570674983850549458858692699569092721079750930295532116534498720275596023648066549911988183479775356636980742654252786255181841757467289097777279380008164706001614524919217321721477235014144197356854816136115735255213347574184946843852332390739414333454776241686251898356948556209921922218427255025425688767179049460165346680498862723279178608578438382796797668145410095388378636095068006422512520511739298489608412848862694560424196528502221066118630674427862203919494504712371378696095636437191728746776465757396241389086583264599581339047802759009
 #endif
+
+#define NOT_IMPLEMENTED do { fprintf(stderr, "%s:%d: NOT_IMPLEMENTED\n", __FILE__, __LINE__); abort(); } while(0)
 
 typedef long double val_t;
 typedef val_t ang_t;
@@ -21,10 +24,26 @@ typedef struct {
 
 Vec3 vec3(val_t x, val_t y, val_t z);
 
+Vec3 vec3_add_s (Vec3 v1, val_t scalar);
+Vec3 vec3_div_s (Vec3 v1, val_t scalar);
+Vec3 vec3_mult_s(Vec3 v1, val_t scalar);
+
+Vec3 vec3_add (Vec3 v1, Vec3 v2);
+Vec3 vec3_div (Vec3 v1, Vec3 v2);
+Vec3 vec3_mult(Vec3 v1, Vec3 v2);
+Vec3 vec3_avg (Vec3 v1, Vec3 v2);
+
+
 typedef struct {
     val_t mag;
     ang_t ang;
 } Polar2D;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    size_t* items;
+} Indexes;
 
 typedef struct {
     size_t count;
@@ -98,6 +117,33 @@ Vec3 vec3(val_t x, val_t y, val_t z) {
     return v;
 }
 
+Vec3 vec3_add_s(Vec3 v1, val_t scalar) {
+    return vec3(v1.x + scalar, v1.y + scalar, v1.z + scalar);
+}
+
+Vec3 vec3_div_s(Vec3 v1, val_t scalar) {
+    return vec3(v1.x / scalar, v1.y / scalar, v1.z / scalar);
+}
+
+Vec3 vec3_mult_s(Vec3 v1, val_t scalar) {
+    return vec3(v1.x * scalar, v1.y * scalar, v1.z * scalar);
+}
+
+Vec3 vec3_add(Vec3 v1, Vec3 v2) {
+    return vec3(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z);
+}
+
+Vec3 vec3_div (Vec3 v1, Vec3 v2) {
+    return vec3(v1.x / v2.x, v1.y / v2.y, v1.z / v2.z);
+}
+Vec3 vec3_mult(Vec3 v1, Vec3 v2) {
+    return vec3(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z);
+}
+
+Vec3 vec3_avg(Vec3 v1, Vec3 v2) {
+    return vec3_div_s(vec3_add(v1, v2), 2);
+}
+
 Face __face(size_t count, size_t* indexes) {
     Face ret = {
         .count = count, 
@@ -156,6 +202,34 @@ void cad_free(CAD obj) {
 }
 
 #define da_size(array) ((array.capacity) > 0 ? sizeof(array.items[0]) * (array.capacity) : 0)
+#define da_last(array) (array.items[(array.count-1)])
+#define da_last_index(array) ((array).count-1)
+
+#ifndef DA_INIT_CAP 
+#define DA_INIT_CAP 10
+#endif
+
+#define da_append(da, item)                                                          \
+do {                                                                                 \
+    if ((da)->count >= (da)->capacity) {                                             \
+        (da)->capacity = (da)->capacity == 0 ? DA_INIT_CAP : (da)->capacity*2;       \
+        (da)->items = realloc((da)->items, (da)->capacity*sizeof(*(da)->items));     \
+    }                                                                                \
+    (da)->items[(da)->count++] = (item);                                             \
+} while (0)
+
+#define da_insert(da, index, item)                                                   \
+do {                                                                                 \
+    if ((da)->count >= (da)->capacity) {                                             \
+        (da)->capacity = (da)->capacity == 0 ? DA_INIT_CAP : (da)->capacity*2;       \
+        (da)->items = realloc((da)->items, (da)->capacity*sizeof(*(da)->items));     \
+    }                                                                                \
+    for (size_t acb = (da)->count; acb > (index); --acb) {                           \
+        (da)->items[acb] = (da)->items[acb-1];                                       \
+    }                                                                                \
+    (da)->count += 1;                                                                \
+    (da)->items[(index)] = (item);                                                   \
+} while (0)
 
 Face copy_face(Face f) {
     Face ret;
@@ -222,14 +296,14 @@ CAD cad_cube(val_t l) {
         ),
         .faces = faces(
             // Each pair are opposites
-            face(0, 1, 2, 3),
+            face(3, 2, 1, 0),
             face(4, 5, 6, 7),
 
             face(0, 1, 5, 4),
             face(2, 3, 7, 6),
 
             face(1, 2, 6, 5),
-            face(4, 0, 3, 7)
+            face(7, 3, 0, 4)
         )
     };
     return c;
@@ -317,10 +391,29 @@ CAD cad_scale(Vec3 v, CAD obj) {
     return obj;
 }
 
+CAD cad_clone(CAD obj) {
+    CAD new_obj;
+    new_obj.points.count = obj.points.count;
+    new_obj.points.capacity = obj.points.capacity;
+    new_obj.points.items = malloc(new_obj.points.capacity * sizeof(Vec3));
+    memcpy(new_obj.points.items, obj.points.items, new_obj.points.capacity * sizeof(Vec3));
+
+    new_obj.faces.count = obj.faces.count;
+    new_obj.faces.capacity = obj.faces.capacity;
+    new_obj.faces.items = malloc(new_obj.faces.capacity * sizeof(Face));
+    for (size_t i = 0; i < obj.faces.count; ++i) {
+        new_obj.faces.items[i].count    = obj.faces.items[i].count;
+        new_obj.faces.items[i].capacity = obj.faces.items[i].capacity;
+        new_obj.faces.items[i].items = malloc(obj.faces.items[i].capacity * sizeof(size_t));
+        memcpy(new_obj.faces.items[i].items, obj.faces.items[i].items, obj.faces.items[i].count * sizeof(size_t));
+    }
+
+    return new_obj;
+}
 
 typedef struct {
-    size_t a;
-    size_t b;
+    size_t first;
+    size_t second;
 } IndexPair;
 
 typedef struct {
@@ -329,62 +422,296 @@ typedef struct {
     IndexPair* items;
 } IndexPairs;
 
+bool is_same_pair(IndexPair ip1, IndexPair ip2) {
+    return ((ip1.first == ip2.first  && ip1.second == ip2.second) ||
+           (ip1.first == ip2.second && ip1.second == ip2.first));
+}
+
 CAD cad_split_edge(CAD obj, IndexPair edge) {
-    ...
+    IndexPair current_edge; 
+    Vec3 new_point = vec3_avg(obj.points.items[edge.first], obj.points.items[edge.second]);
+    da_append(&obj.points, new_point);
+    for (size_t i = 0; i < obj.faces.count; ++i){
+        Face f = obj.faces.items[i];
+        for (size_t j = 0; j < f.count; ++j) { 
+            current_edge.first  = f.items[j];
+            current_edge.second = f.items[(j + 1) % f.count];
+            if (is_same_pair(current_edge, edge)) {
+                da_insert(&f, (j + 1), obj.points.count-1);
+                break;
+            }
+        }
+        obj.faces.items[i] = f;
+    }
+    return obj;
 }
 
 IndexPairs get_all_edges(CAD obj) {
-    ...
+    IndexPairs edges = {
+        .count = 0,
+        .capacity = 1,
+        .items = malloc(sizeof(IndexPair))
+    };
+    for (size_t i = 0; i < obj.faces.count; ++i) {
+        Face f = obj.faces.items[i];
+        for (size_t j = 0; j < f.count; ++j) {
+            IndexPair edge = {
+                .first = f.items[j],
+                .second = f.items[(j + 1) % f.count]
+            };
+
+            bool edge_already_exists = false;
+            for (size_t k = 0; k < edges.count; ++k) { 
+                if (is_same_pair(edges.items[k], edge)) {
+                    edge_already_exists = true;
+                    break;
+                }
+            }
+            if (!edge_already_exists) {
+                da_append(&edges, edge);
+            }
+        }
+    }
+    return edges;
 }
 
-Faces get_adjancent_faces_to_edge(IndexPair edge) {
-    ...
+IndexPair get_adjancent_face_indexes_to_edge(CAD obj, IndexPair edge) {
+    IndexPair ret;
+    bool collected_first = false;
+    for (size_t i = 0; i < obj.faces.count; ++i) {
+        Face f = obj.faces.items[i];
+        for (size_t j = 0; j < f.count; ++j) {
+            IndexPair current_edge = {
+                .first = f.items[j],
+                .second = f.items[(j + 1) % f.count]
+            };
+            if (is_same_pair(current_edge, edge)) {
+                if (!collected_first) {
+                    ret.first  = i;
+                    collected_first = true;
+                } else {
+                    ret.second = i;
+                    return ret;
+                }
+            }
+        }
+    }
+    fprintf(stderr, "ERROR: Couldn't find two adjancent faces to the edge %zu - %zu\n", edge.first, edge.second);
+    exit(1);
 }
+
+Indexes get_face_indexes_containing_point(CAD obj, size_t point_index) {
+    Indexes ret = {
+        .count = 0,
+        .capacity = 1,
+        .items = malloc(sizeof(size_t))
+    };
+
+    for (size_t i = 0; i < obj.faces.count; ++i) {
+        Face f = obj.faces.items[i];
+        for (size_t j = 0; j < f.count; ++j) {
+            if (f.items[j] == point_index) {
+                da_append(&ret, i);
+                break;
+            }
+        }
+    }
+    return ret;
+}
+
+IndexPairs get_all_edges_containing_point(CAD obj, size_t point_index) {
+    IndexPairs ret = {
+        .count = 0,
+        .capacity = 1,
+        .items = malloc(sizeof(IndexPair))
+    };
+
+    for (size_t i = 0; i < obj.faces.count; ++i) {
+        Face f = obj.faces.items[i];
+        for (size_t j = 0; j < f.count; ++j) {
+            if (f.items[j] != point_index) continue; // check point in edge
+            
+            IndexPair current_edge = {
+                .first = f.items[j],
+                .second = f.items[(j + 1) % f.count]
+            };
+
+            // check for duplicate edges
+            bool edge_already_exists = false;
+            for (size_t k; k < ret.count; ++k) { 
+                if (is_same_pair(ret.items[k], current_edge)) {
+                    edge_already_exists = true;
+                    break;
+                }
+            }
+            if (edge_already_exists) continue;
+                
+
+            da_append(&ret, current_edge);
+            break;
+        }
+    }
+
+    return ret;
+}
+
+void print_points (Points ps) {
+    printf("--------------------------\n");
+    for (size_t i = 0; i < ps.count; ++i)
+        printf("        [%.10Lf, %.10Lf, %.10Lf],\n", ps.items[i].x, ps.items[i].y, ps.items[i].z);
+    printf("--------------------------\n");
+}
+
+void print_point(Vec3 p) {
+    printf("        [%.10Lf, %.10Lf, %.10Lf],\n", p.x, p.y, p.z);
+}
+
+void print_faces(Faces faces) {
+    printf("--------------------------\n");
+    for (size_t j = 0; j < faces.count; ++j) {
+        Face f = faces.items[j];
+        printf("[");
+        for (size_t k = 0; k < f.count; ++k) {
+            printf("%zu,", f.items[k]);
+        } 
+        printf("]\n");
+    }
+    printf("--------------------------\n");
+}
+
+void print_face(Face f) {
+    printf("[");
+    for (size_t k = 0; k < f.count; ++k)
+        printf("%zu,", f.items[k]);
+    printf("]\n");
+}
+
 
 CAD cad_catmull_clark(CAD obj) {
     const int original_point = 1;
     const int edge_point = 2;
     const int face_point = 3;
 
+    CAD old_object = cad_clone(obj);
+
     for (size_t i = 0; i < obj.points.count; ++i) {
         obj.points.items[i].mark = original_point;
     }
 
+    // Face points
     Points face_points = {
-        count = 0;
-        capacity = obj.faces.count;
-        items = malloc(obj.faces.count * sizeof(Vec3));
-    }
+        .count = 0,
+        .capacity = obj.faces.count,
+        .items = malloc(obj.faces.count * sizeof(Vec3)),
+    };
 
+
+    
     for (size_t i = 0; i < obj.faces.count; ++i) {
         Face f = obj.faces.items[i];
-        Vec3 avg = 0;
+        Vec3 avg = vec3(0, 0, 0);
         for (size_t j = 0; j < f.count; ++j) {
-            avg.x += f.items[j].x; 
-            avg.y += f.items[j].y; 
-            avg.z += f.items[j].z; 
+            avg.x += obj.points.items[f.items[j]].x; 
+            avg.y += obj.points.items[f.items[j]].y; 
+            avg.z += obj.points.items[f.items[j]].z; 
         }
-        avg.x = avg.x / obj.faces.count;
-        avg.y = avg.y / obj.faces.count;
-        avg.z = avg.z / obj.faces.count;
+        avg.x = avg.x / f.count;
+        avg.y = avg.y / f.count;
+        avg.z = avg.z / f.count;
 
-        face_points[i] = avg; 
+        face_points.items[i] = avg; 
+        face_points.count += 1;
     }
 
+    
+    // Edge points
     IndexPairs original_edges = get_all_edges(obj);
+
+
     for (size_t i = 0; i < original_edges.count; ++i) {
-        cad_split_edge(obj, original_edges[i]); // edge point gets added at the end
+        IndexPair adjancent_faces = get_adjancent_face_indexes_to_edge(old_object, original_edges.items[i]);
+        printf("Edge %zu - %zu\n", original_edges.items[i].first, original_edges.items[i].second);
 
-        obj.points.items[obj.points.count-1].mark = edge_point;
+        obj = cad_split_edge(obj, original_edges.items[i]); // edge point gets added at the end
+        Vec3 avg = vec3(0, 0, 0);
+        avg = vec3_add(avg, obj.points.items[original_edges.items[i].first]);
+        avg = vec3_add(avg, obj.points.items[original_edges.items[i].second]);
+        avg = vec3_add(avg, face_points.items[adjancent_faces.first]);
+        avg = vec3_add(avg, face_points.items[adjancent_faces.second]);
+        da_last(obj.points) = vec3_div_s(avg, 4);
 
-        IndexPair adjancent_faces = get_adjancent_face_indexes_to_edge(original_edges[i]);
-        obj.points.items[obj.points.count-1] = (original_edges[i].a + 
-                                                original_edges[i].b +
-                                                face_points[adjancent_faces.a] +
-                                                face_points[adjancent_faces.b]) / 4;
+        da_last(obj.points).mark = edge_point;
     }
 
+    for (size_t i = 0; i < obj.points.count; ++i) {
+        if (obj.points.items[i].mark != original_point) continue;
+        
+        Indexes touching_face_indexes = get_face_indexes_containing_point(obj, i);
+        IndexPairs touching_edge_indexes = get_all_edges_containing_point(old_object, i);
+    
+        Vec3 face_points_avg = vec3(0, 0, 0);
+        for (size_t j = 0; j < touching_face_indexes.count; ++j) {
+            face_points_avg = vec3_add(face_points_avg, face_points.items[touching_face_indexes.items[j]]);
+        }
+        face_points_avg = vec3_div_s(face_points_avg, touching_face_indexes.count);
 
+        Vec3 edge_points_avg = vec3(0, 0, 0);
+        for (size_t j = 0; j < touching_edge_indexes.count; ++j) {
+            IndexPair edge = touching_edge_indexes.items[j];
+            if (edge.first  == i) edge_points_avg = vec3_add(edge_points_avg, vec3_avg(old_object.points.items[edge.first], old_object.points.items[edge.second]));
+        }
+        edge_points_avg = vec3_div_s(edge_points_avg, touching_edge_indexes.count);
+
+        Vec3 new_point = 
+            vec3_div_s(
+                vec3_add(
+                    vec3_add(
+                        face_points_avg, 
+                        vec3_mult_s(edge_points_avg, 2)
+                    ),
+                    vec3_mult_s(obj.points.items[i], touching_edge_indexes.count - 3)
+                ),
+                touching_edge_indexes.count
+            );
+
+
+        new_point.mark = original_point;
+        obj.points.items[i] = new_point; 
+    }
+
+    // New object and faces
+    CAD new_obj = {
+        .points = obj.points,
+        .faces =  (Faces){
+            .count = 0,
+            .capacity = 1,
+            .items = malloc(sizeof(Face))
+
+        }
+    };
+
+    for (size_t i = 0; i < obj.faces.count; ++i) {
+        Face old_face = obj.faces.items[i];
+        da_append(&new_obj.points, face_points.items[i]); // Face point gets appended here
+    
+        for (size_t j = 0; j < old_face.count; ++j) { // Making triangular faces instead of squares, should be the same thing.
+            if (obj.points.items[old_face.items[j]].mark != edge_point) continue;
+            Face new_face = {
+                .count = 0,
+                .capacity = 1,
+                .items = (size_t*)malloc(sizeof(size_t))
+            };
+            da_append(&new_face, old_face.items[j]);
+            da_append(&new_face, old_face.items[(j+1)%old_face.count]);
+            da_append(&new_face, old_face.items[(j+2)%old_face.count]);
+            da_append(&new_face, da_last_index(new_obj.points)); // Face point gets used here
+            da_append(&new_obj.faces, new_face);
+        }
+    }
+    
+    // free_faces(obj.faces);
+    // obj.faces = new_obj.faces;
+    return new_obj;
 }
 
 #endif // CADIGO_IMPLEMENTATION
