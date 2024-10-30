@@ -1,6 +1,7 @@
 #ifndef CADIGO_H_
 #define CADIGO_H_
 
+#include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
@@ -99,12 +100,21 @@ CAD cad_scale(Vec3 v, CAD obj);
 CAD cad_catmull_clark(CAD obj);
 CAD cad_subdivide(CAD obj);
 
+CAD cad_extrude(CAD obj, double h);
+
 // Operations - Booleans
 CAD cad_intersection(CAD obj);
 CAD cad_difference(CAD obj);
 CAD cad_union(CAD obj);
 
 #endif // CADIGO_H_
+
+
+
+// ------ Implementation -------
+
+
+
 
 #ifdef CADIGO_IMPLEMENTATION
 
@@ -220,40 +230,18 @@ do {                                                                            
 
 #define da_insert(da, index, item)                                                   \
 do {                                                                                 \
+    size_t __index = (index);                                                        \
     if ((da)->count >= (da)->capacity) {                                             \
         (da)->capacity = (da)->capacity == 0 ? DA_INIT_CAP : (da)->capacity*2;       \
         (da)->items = realloc((da)->items, (da)->capacity*sizeof(*(da)->items));     \
     }                                                                                \
-    for (size_t acb = (da)->count; acb > (index); --acb) {                           \
-        (da)->items[acb] = (da)->items[acb-1];                                       \
+    for (size_t __i = (da)->count; __i > __index; --__i) {                           \
+        (da)->items[__i] = (da)->items[__i-1];                                       \
     }                                                                                \
     (da)->count += 1;                                                                \
-    (da)->items[(index)] = (item);                                                   \
+    (da)->items[__index] = (item);                                                   \
 } while (0)
 
-Face copy_face(Face f) {
-    Face ret;
-    ret.count = f.count;
-    ret.capacity = f.capacity;
-    ret.items = (size_t*)malloc(da_size(f));
-    memcpy(ret.items, f.items, da_size(f));
-    return ret;
-}
-
-CAD cad_copy(CAD obj) {
-    CAD ret;
-    ret.points.count    = obj.points.count;
-    ret.points.capacity = obj.points.capacity;
-    ret.points.items    = (Vec3*)malloc(da_size(obj.points));
-    memcpy(ret.points.items, obj.points.items, da_size(obj.points));
-
-    ret.faces.count    = obj.faces.count;
-    ret.faces.capacity = obj.faces.capacity;
-    ret.faces.items    = (Face*)malloc(da_size(obj.faces));
-    for (size_t i = 0; i < obj.faces.count; ++i)
-        ret.faces.items[i] = copy_face(ret.faces.items[i]);
-    return ret;
-}
 
 CAD cad_polyhedron(Points points, Faces faces) {
     return (CAD){.points = points, .faces = faces};
@@ -391,24 +379,28 @@ CAD cad_scale(Vec3 v, CAD obj) {
     return obj;
 }
 
-CAD cad_clone(CAD obj) {
-    CAD new_obj;
-    new_obj.points.count = obj.points.count;
-    new_obj.points.capacity = obj.points.capacity;
-    new_obj.points.items = malloc(new_obj.points.capacity * sizeof(Vec3));
-    memcpy(new_obj.points.items, obj.points.items, new_obj.points.capacity * sizeof(Vec3));
+Face cad_copy_face(Face f) {
+    Face ret;
+    ret.count = f.count;
+    ret.capacity = f.capacity;
+    ret.items = (size_t*)malloc(da_size(f));
+    memcpy(ret.items, f.items, da_size(f));
+    return ret;
+}
 
-    new_obj.faces.count = obj.faces.count;
-    new_obj.faces.capacity = obj.faces.capacity;
-    new_obj.faces.items = malloc(new_obj.faces.capacity * sizeof(Face));
-    for (size_t i = 0; i < obj.faces.count; ++i) {
-        new_obj.faces.items[i].count    = obj.faces.items[i].count;
-        new_obj.faces.items[i].capacity = obj.faces.items[i].capacity;
-        new_obj.faces.items[i].items = malloc(obj.faces.items[i].capacity * sizeof(size_t));
-        memcpy(new_obj.faces.items[i].items, obj.faces.items[i].items, obj.faces.items[i].count * sizeof(size_t));
-    }
+CAD cad_copy(CAD obj) {
+    CAD ret;
+    ret.points.count    = obj.points.count;
+    ret.points.capacity = obj.points.capacity;
+    ret.points.items    = (Vec3*)malloc(da_size(obj.points));
+    memcpy(ret.points.items, obj.points.items, da_size(obj.points));
 
-    return new_obj;
+    ret.faces.count    = obj.faces.count;
+    ret.faces.capacity = obj.faces.capacity;
+    ret.faces.items    = (Face*)malloc(da_size(obj.faces));
+    for (size_t i = 0; i < obj.faces.count; ++i)
+        ret.faces.items[i] = cad_copy_face(obj.faces.items[i]);
+    return ret;
 }
 
 typedef struct {
@@ -431,17 +423,16 @@ CAD cad_split_edge(CAD obj, IndexPair edge) {
     IndexPair current_edge; 
     Vec3 new_point = vec3_avg(obj.points.items[edge.first], obj.points.items[edge.second]);
     da_append(&obj.points, new_point);
-    for (size_t i = 0; i < obj.faces.count; ++i){
-        Face f = obj.faces.items[i];
-        for (size_t j = 0; j < f.count; ++j) { 
-            current_edge.first  = f.items[j];
-            current_edge.second = f.items[(j + 1) % f.count];
+    for (size_t i = 0; i < obj.faces.count; ++i) {
+        Face* f = &obj.faces.items[i];
+        for (size_t j = 0; j < f->count; ++j) { 
+            current_edge.first  = f->items[j];
+            current_edge.second = f->items[(j + 1) % f->count];
             if (is_same_pair(current_edge, edge)) {
-                da_insert(&f, (j + 1), obj.points.count-1);
+                da_insert(f, (j + 1) % f->count, obj.points.count-1);
                 break;
             }
         }
-        obj.faces.items[i] = f;
     }
     return obj;
 }
@@ -592,11 +583,10 @@ CAD cad_catmull_clark(CAD obj) {
     const int edge_point = 2;
     const int face_point = 3;
 
-    CAD old_object = cad_clone(obj);
-
-    for (size_t i = 0; i < obj.points.count; ++i) {
+    for (size_t i = 0; i < obj.points.count; ++i)
         obj.points.items[i].mark = original_point;
-    }
+
+    CAD old_object = cad_copy(obj);
 
     // Face points
     Points face_points = {
@@ -605,21 +595,13 @@ CAD cad_catmull_clark(CAD obj) {
         .items = malloc(obj.faces.count * sizeof(Vec3)),
     };
 
-
-    
     for (size_t i = 0; i < obj.faces.count; ++i) {
         Face f = obj.faces.items[i];
-        Vec3 avg = vec3(0, 0, 0);
-        for (size_t j = 0; j < f.count; ++j) {
-            avg.x += obj.points.items[f.items[j]].x; 
-            avg.y += obj.points.items[f.items[j]].y; 
-            avg.z += obj.points.items[f.items[j]].z; 
-        }
-        avg.x = avg.x / f.count;
-        avg.y = avg.y / f.count;
-        avg.z = avg.z / f.count;
+        Vec3 sum = vec3(0, 0, 0);
+        for (size_t j = 0; j < f.count; ++j)
+            sum = vec3_add(sum, obj.points.items[f.items[j]]);
 
-        face_points.items[i] = avg; 
+        face_points.items[i] = vec3_div_s(sum, f.count);
         face_points.count += 1;
     }
 
@@ -627,10 +609,8 @@ CAD cad_catmull_clark(CAD obj) {
     // Edge points
     IndexPairs original_edges = get_all_edges(obj);
 
-
     for (size_t i = 0; i < original_edges.count; ++i) {
         IndexPair adjancent_faces = get_adjancent_face_indexes_to_edge(old_object, original_edges.items[i]);
-        printf("Edge %zu - %zu\n", original_edges.items[i].first, original_edges.items[i].second);
 
         obj = cad_split_edge(obj, original_edges.items[i]); // edge point gets added at the end
         Vec3 avg = vec3(0, 0, 0);
@@ -647,7 +627,6 @@ CAD cad_catmull_clark(CAD obj) {
         if (obj.points.items[i].mark != original_point) continue;
         
         Indexes touching_face_indexes = get_face_indexes_containing_point(obj, i);
-        IndexPairs touching_edge_indexes = get_all_edges_containing_point(old_object, i);
     
         Vec3 face_points_avg = vec3(0, 0, 0);
         for (size_t j = 0; j < touching_face_indexes.count; ++j) {
@@ -655,25 +634,20 @@ CAD cad_catmull_clark(CAD obj) {
         }
         face_points_avg = vec3_div_s(face_points_avg, touching_face_indexes.count);
 
+
+        IndexPairs touching_edge_indexes = get_all_edges_containing_point(old_object, i);
         Vec3 edge_points_avg = vec3(0, 0, 0);
         for (size_t j = 0; j < touching_edge_indexes.count; ++j) {
             IndexPair edge = touching_edge_indexes.items[j];
-            if (edge.first  == i) edge_points_avg = vec3_add(edge_points_avg, vec3_avg(old_object.points.items[edge.first], old_object.points.items[edge.second]));
+            if (edge.first == i) edge_points_avg = vec3_add(edge_points_avg, vec3_avg(old_object.points.items[edge.first], old_object.points.items[edge.second]));
         }
         edge_points_avg = vec3_div_s(edge_points_avg, touching_edge_indexes.count);
 
-        Vec3 new_point = 
-            vec3_div_s(
-                vec3_add(
-                    vec3_add(
-                        face_points_avg, 
-                        vec3_mult_s(edge_points_avg, 2)
-                    ),
-                    vec3_mult_s(obj.points.items[i], touching_edge_indexes.count - 3)
-                ),
-                touching_edge_indexes.count
-            );
-
+        Vec3 new_point = vec3(0, 0, 0);
+        new_point = vec3_add(new_point, vec3_mult_s(face_points_avg, 1));
+        new_point = vec3_add(new_point, vec3_mult_s(edge_points_avg, 2));
+        new_point = vec3_add(new_point, vec3_mult_s(obj.points.items[i], touching_edge_indexes.count - 3));
+        new_point = vec3_div_s(new_point, touching_edge_indexes.count);
 
         new_point.mark = original_point;
         obj.points.items[i] = new_point; 
@@ -708,10 +682,86 @@ CAD cad_catmull_clark(CAD obj) {
             da_append(&new_obj.faces, new_face);
         }
     }
-    
-    // free_faces(obj.faces);
-    // obj.faces = new_obj.faces;
+
+    cad_free(old_object);
+    free_faces(obj.faces);
     return new_obj;
+}
+
+
+CAD cad_subdivide(CAD obj) {
+    return cad_catmull_clark(obj);
+}
+
+Face reverse_face(Face f) {
+    size_t start = 0;
+    size_t end = f.count - 1;
+    while (start < end) {
+        size_t temp = f.items[start];
+        f.items[start] = f.items[end];
+        f.items[end] = temp;
+
+        start++;
+        end--;
+    }
+    return f;
+}
+
+// CAD_Array range(size_t beg, size_t end, size_t step) {
+//     size_t count = end - beg;
+//     int* array = (int*)malloc(count*sizeof(int));  
+//
+//     for (size_t i = 0; i < count; i += step) {
+//         array[i] = (int)i + (int)beg;
+//     }
+//     CAD_Array ret = {.count=count, .element_size=sizeof(int), .values=array};
+//     return ret;
+// }
+
+CAD make_little_faces_around(CAD obj) {
+    Face face_1 = obj.faces.items[0];
+    Face face_2 = obj.faces.items[1];
+
+    for (size_t i=0; i < face_1.count; ++i) {
+        Face new_face = {
+            .count = 4,
+            .capacity = 5,
+            .items = malloc(5*sizeof(size_t))
+        };
+
+        new_face.items[3] = face_1.items[i];
+        new_face.items[2] = face_1.items[(i + 1) % face_1.count];
+        new_face.items[1] = face_1.items[(i + 1) % face_2.count] + face_1.count;
+        new_face.items[0] = face_1.items[i] + face_1.count;
+
+        da_append(&obj.faces, new_face);
+    }
+    return obj;
+}
+
+CAD cad_clone_face_with_points(CAD obj, size_t face_index) {
+    Face new_face = cad_copy_face(obj.faces.items[face_index]);
+    for (size_t i = 0; i < new_face.count; ++i) {
+        da_append(&obj.points, obj.points.items[new_face.items[i]]);
+        new_face.items[i] = obj.points.count-1;
+    }
+    da_append(&obj.faces, new_face);
+    return obj;
+}
+
+CAD cad_extrude(CAD obj, double h) {
+    assert(obj.faces.count == 1);
+    obj = cad_clone_face_with_points(obj, 0);
+    obj.faces.items[1] = reverse_face(obj.faces.items[1]);
+
+    print_face(obj.faces.items[0]);
+    print_face(obj.faces.items[1]);
+
+    for (size_t i = 0; i < obj.faces.items[1].count; ++i) {
+        obj.points.items[obj.faces.items[1].items[i]] = vec3_add(vec3(0, 0, h), obj.points.items[obj.faces.items[1].items[i]]);
+    } 
+    obj = make_little_faces_around(obj);
+    return obj;
 }
 
 #endif // CADIGO_IMPLEMENTATION

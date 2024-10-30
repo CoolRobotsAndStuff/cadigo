@@ -18,7 +18,18 @@ int main(int argc, char **argv) {
                    "examples/openscad/example_polyhedron.c",
                    "-lm"
     );
-    if (!nob_cmd_run_sync(cmd)) return 1;
+    if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
+
+    nob_cmd_append(&cmd,
+                   "gcc",
+                   "-std=c11",
+                   "-Wall", "-Wextra",
+                   "-Isrc",
+                   "-o", "build/glasses_example",
+                   "examples/glasses/glasses_shape.c",
+                   "-lm"
+    );
+    if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
     return 0;
 }
 
