@@ -242,6 +242,14 @@ do {                                                                            
     (da)->items[__index] = (item);                                                   \
 } while (0)
 
+#define da_delete(da, index)                                    \
+do {                                                            \
+    size_t __index = (index);                                   \
+    for (size_t __i = __index; __i < (da)->count-1; ++__i)      \
+        (da)->items[__i] = (da)->items[__i+1];                  \
+    (da)->count -= 1;                                           \
+} while(0);
+
 
 CAD cad_polyhedron(Points points, Faces faces) {
     return (CAD){.points = points, .faces = faces};
@@ -762,6 +770,47 @@ CAD cad_extrude(CAD obj, double h) {
     } 
     obj = make_little_faces_around(obj);
     return obj;
+}
+
+Vec3 get_face_center(CAD obj, size_t face_index) {
+    Vec3 sum = vec3(0, 0, 0);
+    for (size_t i = 0; i < obj.faces.items[face_index].count; ++i)
+        sum = vec3_add(sum, obj.points.items[obj.faces.items[face_index].items[i]]);
+    return vec3_div_s(sum, obj.faces.items[face_index].count);
+}
+
+// amount between zero and one
+CAD cad_inset_face(CAD obj, size_t face_index, val_t amount) {
+    assert(amount >= 0 && amount <= 1);
+    obj = cad_clone_face_with_points(obj, face_index);
+
+    Face og_face  = obj.faces.items[face_index];
+    Face new_face = obj.faces.items[obj.faces.count-1];
+
+    Vec3 face_center = get_face_center(obj, face_index);
+    
+    for (size_t i = 0; i < new_face.count; ++i) {
+        obj.points.items[new_face.items[i]] = 
+            vec3_add(
+                vec3_mult_s(obj.points.items[new_face.items[i]], 1 - amount),
+                vec3_mult_s(face_center                         , amount)
+            );
+
+        Face new_border_face;
+        new_border_face.count = 4;
+        new_border_face.capacity = 5;
+        new_border_face.items = malloc(sizeof(size_t) * new_border_face.capacity);
+
+        new_border_face.items[0] =  og_face.items[i];
+        new_border_face.items[1] =  og_face.items[(i + 1) % og_face.count];
+        new_border_face.items[2] = new_face.items[(i + 1) % new_face.count];
+        new_border_face.items[3] = new_face.items[i];
+        da_append(&obj.faces, new_border_face);
+    }
+    free_face(obj.faces.items[face_index]);
+    da_delete(&obj.faces, face_index);
+    return obj;
+
 }
 
 #endif // CADIGO_IMPLEMENTATION
