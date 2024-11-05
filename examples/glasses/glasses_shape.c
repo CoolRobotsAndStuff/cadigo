@@ -6,8 +6,7 @@
 #include <stdio.h>
 
 int main() {
-    CAD c = {
-        .points = points(
+    CAD c = cad_polygon_from_points(
             vec3(-0.3 , 25  , 0.5), 
             vec3(0.5  , 20  , 0.5),
             vec3(1.5  , 15  , 0.5),
@@ -48,24 +47,7 @@ int main() {
             vec3(1    , 35  , 0),
             vec3(0    , 32.75,0),
             vec3(-0.5 , 30  , 0.1),
-        )
-    };
-    
-    c.faces = (Faces) {
-        .count = 1,
-        .capacity = 2,
-    };
-    c.faces.items = malloc(c.faces.capacity * sizeof(Face));
-
-    Face f = {
-        .count = c.points.count,
-        .capacity = c.points.count + 1
-    };
-    f.items = malloc(f.capacity * sizeof(size_t));
-
-    for (size_t i = 0; i < f.count; ++i) f.items[i] = i;
-
-    c.faces.items[0] = f;
+    );
 
     c = cad_extrude(c, 4);
 

@@ -12,6 +12,8 @@
 #endif
 
 #define NOT_IMPLEMENTED do { fprintf(stderr, "%s:%d: NOT_IMPLEMENTED\n", __FILE__, __LINE__); abort(); } while(0)
+#define UNUSED(variable) (void) variable
+
 
 typedef long double val_t;
 typedef val_t ang_t;
@@ -72,6 +74,7 @@ Points __points(size_t count, Vec3* points);
 #define faces(...)  __faces (sizeof((Face[])  {__VA_ARGS__}) / sizeof(Face)  , (Face[])  {__VA_ARGS__})
 #define points(...) __points(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3)  , (Vec3[])  {__VA_ARGS__})
 
+
 void free_face(Face f);
 void free_faces(Faces fs);
 void free_points(Points p);
@@ -88,6 +91,9 @@ CAD cad_copy(CAD obj);
 CAD cad_polyhedron(Points points, Faces faces);
 CAD cad_polygon(Points points);
 CAD cad_line(Points points);
+
+CAD __cad_polygon_from_points(size_t count, Vec3* points);
+#define cad_polygon_from_points(...) __cad_polygon_from_points(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3)  , (Vec3[])  {__VA_ARGS__})
 
 CAD cad_cube(val_t l);
 
@@ -185,6 +191,10 @@ Points __points(size_t count, Vec3* points) {
 
     memcpy(ret.items, points, sizeof(Vec3) * count);
     return ret;
+}
+
+CAD __cad_polygon_from_points(size_t count, Vec3* points) {
+    return cad_polygon(__points(count, points));
 }
 
 void free_face(Face f) {
@@ -590,6 +600,7 @@ CAD cad_catmull_clark(CAD obj) {
     const int original_point = 1;
     const int edge_point = 2;
     const int face_point = 3;
+    UNUSED(face_point);
 
     for (size_t i = 0; i < obj.points.count; ++i)
         obj.points.items[i].mark = original_point;
@@ -781,7 +792,8 @@ Vec3 get_face_center(CAD obj, size_t face_index) {
 
 // amount between zero and one
 CAD cad_inset_face(CAD obj, size_t face_index, val_t amount) {
-    assert(amount >= 0 && amount <= 1);
+    assert(amount >= 0 && amount <= 1 && "Amount must be between 0 and 1.");
+    assert(face_index < obj.faces.count && "face_index outside of range.");
     obj = cad_clone_face_with_points(obj, face_index);
 
     Face og_face  = obj.faces.items[face_index];
