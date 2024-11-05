@@ -51,8 +51,9 @@ int main() {
 
     cad_extrude(&c, 4);
 
-    c = cad_inset_face(c, 1, .1);
-    c = cad_inset_face(c, 0, .1);
+    cad_inset_face(&c, 1, .1);
+    cad_inset_face(&c, 0, .1);
+
     c = cad_catmull_clark(c);
     c = cad_catmull_clark(c);
 

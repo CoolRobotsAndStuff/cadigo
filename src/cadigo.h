@@ -790,20 +790,20 @@ Vec3 get_face_center(CAD obj, size_t face_index) {
     return vec3_div_s(sum, obj.faces.items[face_index].count);
 }
 
-CAD cad_inset_face(CAD obj, size_t face_index, val_t amount) {
+CAD* cad_inset_face(CAD* obj, size_t face_index, val_t amount) {
     assert(amount >= 0 && amount <= 1 && "Amount must be between 0 and 1.");
-    assert(face_index < obj.faces.count && "face_index outside of range.");
-    cad_clone_face_with_points(&obj, face_index);
+    assert(face_index < obj->faces.count && "face_index outside of range.");
+    cad_clone_face_with_points(obj, face_index);
 
-    Face og_face  = obj.faces.items[face_index];
-    Face new_face = obj.faces.items[obj.faces.count-1];
+    Face og_face  = obj->faces.items[face_index];
+    Face new_face = obj->faces.items[obj->faces.count-1];
 
-    Vec3 face_center = get_face_center(obj, face_index);
+    Vec3 face_center = get_face_center(*obj, face_index);
     
     for (size_t i = 0; i < new_face.count; ++i) {
-        obj.points.items[new_face.items[i]] = 
+        obj->points.items[new_face.items[i]] = 
             vec3_add(
-                vec3_mult_s(obj.points.items[new_face.items[i]], 1 - amount),
+                vec3_mult_s(obj->points.items[new_face.items[i]], 1 - amount),
                 vec3_mult_s(face_center                         , amount)
             );
 
@@ -816,12 +816,11 @@ CAD cad_inset_face(CAD obj, size_t face_index, val_t amount) {
         new_border_face.items[1] =  og_face.items[(i + 1) % og_face.count];
         new_border_face.items[2] = new_face.items[(i + 1) % new_face.count];
         new_border_face.items[3] = new_face.items[i];
-        da_append(&obj.faces, new_border_face);
+        da_append(&obj->faces, new_border_face);
     }
-    free_face(obj.faces.items[face_index]);
-    da_delete(&obj.faces, face_index);
+    free_face(obj->faces.items[face_index]);
+    da_delete(&obj->faces, face_index);
     return obj;
-
 }
 
 #endif // CADIGO_IMPLEMENTATION
