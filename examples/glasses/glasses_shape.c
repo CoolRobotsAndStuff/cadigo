@@ -7,6 +7,7 @@
 
 int main() {
     CAD c = cad_polygon_from_points(
+
             vec3(-0.3 , 25  , 0.5), 
             vec3(0.5  , 20  , 0.5),
             vec3(1.5  , 15  , 0.5),
@@ -47,6 +48,7 @@ int main() {
             vec3(1    , 35  , 0),
             vec3(0    , 32.75,0),
             vec3(-0.5 , 30  , 0.1),
+
     );
 
     cad_extrude(&c, 4);
@@ -54,8 +56,8 @@ int main() {
     cad_inset_face(&c, 1, .1);
     cad_inset_face(&c, 0, .1);
 
-    c = cad_catmull_clark(c);
-    c = cad_catmull_clark(c);
+    cad_catmull_clark(&c);
+    cad_catmull_clark(&c);
 
     FILE *program_file;
     program_file = fopen("examples/glasses/glasses_shape.scad", "w");

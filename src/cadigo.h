@@ -103,8 +103,7 @@ CAD cad_rotate(Vec3 v, CAD obj);
 CAD cad_scale(Vec3 v, CAD obj);
 
 // Operations - Topological Geometry
-CAD cad_catmull_clark(CAD obj);
-CAD cad_subdivide(CAD obj);
+CAD* cad_catmull_clark(CAD* obj);
 
 CAD* cad_extrude(CAD* obj, double h);
 
@@ -437,17 +436,17 @@ bool is_same_pair(IndexPair ip1, IndexPair ip2) {
            (ip1.first == ip2.second && ip1.second == ip2.first));
 }
 
-CAD cad_split_edge(CAD obj, IndexPair edge) {
+CAD* cad_split_edge(CAD* obj, IndexPair edge) {
     IndexPair current_edge; 
-    Vec3 new_point = vec3_avg(obj.points.items[edge.first], obj.points.items[edge.second]);
-    da_append(&obj.points, new_point);
-    for (size_t i = 0; i < obj.faces.count; ++i) {
-        Face* f = &obj.faces.items[i];
+    Vec3 new_point = vec3_avg(obj->points.items[edge.first], obj->points.items[edge.second]);
+    da_append(&obj->points, new_point);
+    for (size_t i = 0; i < obj->faces.count; ++i) {
+        Face* f = &obj->faces.items[i];
         for (size_t j = 0; j < f->count; ++j) { 
             current_edge.first  = f->items[j];
             current_edge.second = f->items[(j + 1) % f->count];
             if (is_same_pair(current_edge, edge)) {
-                da_insert(f, (j + 1) % f->count, obj.points.count-1);
+                da_insert(f, (j + 1) % f->count, obj->points.count-1);
                 break;
             }
         }
@@ -596,29 +595,29 @@ void print_face(Face f) {
 }
 
 
-CAD cad_catmull_clark(CAD obj) {
+CAD* cad_catmull_clark(CAD* obj) {
     const int original_point = 1;
     const int edge_point = 2;
     const int face_point = 3;
     UNUSED(face_point);
 
-    for (size_t i = 0; i < obj.points.count; ++i)
-        obj.points.items[i].mark = original_point;
+    for (size_t i = 0; i < obj->points.count; ++i)
+        obj->points.items[i].mark = original_point;
 
-    CAD old_object = cad_copy(obj);
+    CAD old_object = cad_copy(*obj);
 
     // Face points
     Points face_points = {
         .count = 0,
-        .capacity = obj.faces.count,
-        .items = malloc(obj.faces.count * sizeof(Vec3)),
+        .capacity = obj->faces.count,
+        .items = malloc(obj->faces.count * sizeof(Vec3)),
     };
 
-    for (size_t i = 0; i < obj.faces.count; ++i) {
-        Face f = obj.faces.items[i];
+    for (size_t i = 0; i < obj->faces.count; ++i) {
+        Face f = obj->faces.items[i];
         Vec3 sum = vec3(0, 0, 0);
         for (size_t j = 0; j < f.count; ++j)
-            sum = vec3_add(sum, obj.points.items[f.items[j]]);
+            sum = vec3_add(sum, obj->points.items[f.items[j]]);
 
         face_points.items[i] = vec3_div_s(sum, f.count);
         face_points.count += 1;
@@ -626,26 +625,26 @@ CAD cad_catmull_clark(CAD obj) {
 
     
     // Edge points
-    IndexPairs original_edges = get_all_edges(obj);
+    IndexPairs original_edges = get_all_edges(*obj);
 
     for (size_t i = 0; i < original_edges.count; ++i) {
         IndexPair adjancent_faces = get_adjancent_face_indexes_to_edge(old_object, original_edges.items[i]);
 
-        obj = cad_split_edge(obj, original_edges.items[i]); // edge point gets added at the end
+        cad_split_edge(obj, original_edges.items[i]); // edge point gets added at the end
         Vec3 avg = vec3(0, 0, 0);
-        avg = vec3_add(avg, obj.points.items[original_edges.items[i].first]);
-        avg = vec3_add(avg, obj.points.items[original_edges.items[i].second]);
+        avg = vec3_add(avg, obj->points.items[original_edges.items[i].first]);
+        avg = vec3_add(avg, obj->points.items[original_edges.items[i].second]);
         avg = vec3_add(avg, face_points.items[adjancent_faces.first]);
         avg = vec3_add(avg, face_points.items[adjancent_faces.second]);
-        da_last(obj.points) = vec3_div_s(avg, 4);
+        da_last(obj->points) = vec3_div_s(avg, 4);
 
-        da_last(obj.points).mark = edge_point;
+        da_last(obj->points).mark = edge_point;
     }
 
-    for (size_t i = 0; i < obj.points.count; ++i) {
-        if (obj.points.items[i].mark != original_point) continue;
+    for (size_t i = 0; i < obj->points.count; ++i) {
+        if (obj->points.items[i].mark != original_point) continue;
         
-        Indexes touching_face_indexes = get_face_indexes_containing_point(obj, i);
+        Indexes touching_face_indexes = get_face_indexes_containing_point((*obj), i);
     
         Vec3 face_points_avg = vec3(0, 0, 0);
         for (size_t j = 0; j < touching_face_indexes.count; ++j) {
@@ -665,16 +664,16 @@ CAD cad_catmull_clark(CAD obj) {
         Vec3 new_point = vec3(0, 0, 0);
         new_point = vec3_add(new_point, vec3_mult_s(face_points_avg, 1));
         new_point = vec3_add(new_point, vec3_mult_s(edge_points_avg, 2));
-        new_point = vec3_add(new_point, vec3_mult_s(obj.points.items[i], touching_edge_indexes.count - 3));
+        new_point = vec3_add(new_point, vec3_mult_s(obj->points.items[i], touching_edge_indexes.count - 3));
         new_point = vec3_div_s(new_point, touching_edge_indexes.count);
 
         new_point.mark = original_point;
-        obj.points.items[i] = new_point; 
+        obj->points.items[i] = new_point; 
     }
 
     // New object and faces
     CAD new_obj = {
-        .points = obj.points,
+        .points = obj->points,
         .faces =  (Faces){
             .count = 0,
             .capacity = 1,
@@ -683,12 +682,12 @@ CAD cad_catmull_clark(CAD obj) {
         }
     };
 
-    for (size_t i = 0; i < obj.faces.count; ++i) {
-        Face old_face = obj.faces.items[i];
+    for (size_t i = 0; i < obj->faces.count; ++i) {
+        Face old_face = obj->faces.items[i];
         da_append(&new_obj.points, face_points.items[i]); // Face point gets appended here
     
         for (size_t j = 0; j < old_face.count; ++j) { // Making triangular faces instead of squares, should be the same thing.
-            if (obj.points.items[old_face.items[j]].mark != edge_point) continue;
+            if (obj->points.items[old_face.items[j]].mark != edge_point) continue;
             Face new_face = {
                 .count = 0,
                 .capacity = 1,
@@ -703,14 +702,12 @@ CAD cad_catmull_clark(CAD obj) {
     }
 
     cad_free(old_object);
-    free_faces(obj.faces);
-    return new_obj;
+    free_faces(obj->faces);
+    obj->faces = new_obj.faces;
+    obj->points = new_obj.points;
+    return obj;
 }
 
-
-CAD cad_subdivide(CAD obj) {
-    return cad_catmull_clark(obj);
-}
 
 Face reverse_face(Face f) {
     size_t start = 0;

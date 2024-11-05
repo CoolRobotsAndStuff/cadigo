@@ -7,11 +7,11 @@
 
 int main() {
     CAD c = cad_cube(30);
-    c = cad_catmull_clark(
+   cad_catmull_clark(
         cad_catmull_clark(
         cad_catmull_clark(
         cad_catmull_clark(
-            c
+            &c
         ))));
 
     FILE *program_file;
