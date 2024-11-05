@@ -106,7 +106,7 @@ CAD cad_scale(Vec3 v, CAD obj);
 CAD cad_catmull_clark(CAD obj);
 CAD cad_subdivide(CAD obj);
 
-CAD cad_extrude(CAD obj, double h);
+CAD* cad_extrude(CAD* obj, double h);
 
 // Operations - Booleans
 CAD cad_intersection(CAD obj);
@@ -737,9 +737,9 @@ Face reverse_face(Face f) {
 //     return ret;
 // }
 
-CAD make_little_faces_around(CAD obj) {
-    Face face_1 = obj.faces.items[0];
-    Face face_2 = obj.faces.items[1];
+CAD* make_little_faces_around(CAD* obj) {
+    Face face_1 = obj->faces.items[0];
+    Face face_2 = obj->faces.items[1];
 
     for (size_t i=0; i < face_1.count; ++i) {
         Face new_face = {
@@ -753,33 +753,33 @@ CAD make_little_faces_around(CAD obj) {
         new_face.items[1] = face_1.items[(i + 1) % face_2.count] + face_1.count;
         new_face.items[0] = face_1.items[i] + face_1.count;
 
-        da_append(&obj.faces, new_face);
+        da_append(&obj->faces, new_face);
     }
     return obj;
 }
 
-CAD cad_clone_face_with_points(CAD obj, size_t face_index) {
-    Face new_face = cad_copy_face(obj.faces.items[face_index]);
+CAD* cad_clone_face_with_points(CAD* obj, size_t face_index) {
+    Face new_face = cad_copy_face(obj->faces.items[face_index]);
     for (size_t i = 0; i < new_face.count; ++i) {
-        da_append(&obj.points, obj.points.items[new_face.items[i]]);
-        new_face.items[i] = obj.points.count-1;
+        da_append(&obj->points, obj->points.items[new_face.items[i]]);
+        new_face.items[i] = obj->points.count-1;
     }
-    da_append(&obj.faces, new_face);
+    da_append(&obj->faces, new_face);
     return obj;
 }
 
-CAD cad_extrude(CAD obj, double h) {
-    assert(obj.faces.count == 1);
-    obj = cad_clone_face_with_points(obj, 0);
-    obj.faces.items[1] = reverse_face(obj.faces.items[1]);
+CAD* cad_extrude(CAD* obj, double h) {
+    assert(obj->faces.count == 1);
+    cad_clone_face_with_points(obj, 0);
+    obj->faces.items[1] = reverse_face(obj->faces.items[1]);
 
-    print_face(obj.faces.items[0]);
-    print_face(obj.faces.items[1]);
+    print_face(obj->faces.items[0]);
+    print_face(obj->faces.items[1]);
 
-    for (size_t i = 0; i < obj.faces.items[1].count; ++i) {
-        obj.points.items[obj.faces.items[1].items[i]] = vec3_add(vec3(0, 0, h), obj.points.items[obj.faces.items[1].items[i]]);
+    for (size_t i = 0; i < obj->faces.items[1].count; ++i) {
+        obj->points.items[obj->faces.items[1].items[i]] = vec3_add(vec3(0, 0, h), obj->points.items[obj->faces.items[1].items[i]]);
     } 
-    obj = make_little_faces_around(obj);
+    make_little_faces_around(obj);
     return obj;
 }
 
@@ -790,11 +790,10 @@ Vec3 get_face_center(CAD obj, size_t face_index) {
     return vec3_div_s(sum, obj.faces.items[face_index].count);
 }
 
-// amount between zero and one
 CAD cad_inset_face(CAD obj, size_t face_index, val_t amount) {
     assert(amount >= 0 && amount <= 1 && "Amount must be between 0 and 1.");
     assert(face_index < obj.faces.count && "face_index outside of range.");
-    obj = cad_clone_face_with_points(obj, face_index);
+    cad_clone_face_with_points(&obj, face_index);
 
     Face og_face  = obj.faces.items[face_index];
     Face new_face = obj.faces.items[obj.faces.count-1];
