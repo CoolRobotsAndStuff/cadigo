@@ -51,7 +51,9 @@ int main() {
 
     );
 
-    cad_extrude(&c, 4);
+
+
+    cad_extrude(&c, 2);
 
     cad_inset_face(&c, 1, .1);
     cad_inset_face(&c, 0, .1);
@@ -59,13 +61,7 @@ int main() {
     cad_catmull_clark(&c);
     cad_catmull_clark(&c);
 
-    FILE *program_file;
-    program_file = fopen("examples/glasses/glasses_shape.scad", "w");
-    if (program_file == NULL) {
-        perror("Could not open file.");
-        return 1;
-    }
-    cad_to_openSCAD(program_file, "glasses_shape", c);
-    fclose(program_file);
+    cad_to_openSCAD("examples/glasses/glasses_shape.scad", c);
+
     return 0;
 }

@@ -7,20 +7,14 @@
 
 int main() {
     CAD c = cad_cube(30);
-   cad_catmull_clark(
-        cad_catmull_clark(
-        cad_catmull_clark(
-        cad_catmull_clark(
+    cad_catmull_clark(
+    cad_catmull_clark(
+    cad_catmull_clark(
+    cad_catmull_clark(
             &c
-        ))));
+    ))));
 
-    FILE *program_file;
-    program_file = fopen("examples/openscad/example_polyhedron.scad", "w");
-    if (program_file == NULL) {
-        perror("Could not open file.");
-        return 1;
-    }
-    cad_to_openSCAD(program_file, "my_cube", c);
-    fclose(program_file);
+    cad_to_openSCAD("examples/openscad/example_polyhedron.scad",c);
+
     return 0;
 }
