@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 int main() {
-    CAD c = cad_polygon_from_points(
+    CAD glasses_shape = cad_polygon_from_points(
 
             vec3(-0.3 , 25  , 0.5), 
             vec3(0.5  , 20  , 0.5),
@@ -50,18 +50,24 @@ int main() {
             vec3(-0.5 , 30  , 0.1),
 
     );
+    
+    CAD extruded_glasses_shape = cad_clone(glasses_shape);
+
+    cad_extrude(2, &extruded_glasses_shape);
+    cad_inset_face(1, .1, &extruded_glasses_shape);
+    cad_inset_face(0, .1, &extruded_glasses_shape);
+    cad_catmull_clark(&extruded_glasses_shape);
+    cad_catmull_clark(&extruded_glasses_shape);
+    //cad_to_openSCAD_module("examples/glasses/extruded_glasses_shape.scad", "extruded_glasses_shape", extruded_glasses_shape);
+    cad_to_openSCAD("examples/glasses/extruded_glasses_shape.scad", extruded_glasses_shape);
 
 
+    CAD flattened_glasses_shape = cad_clone(glasses_shape);
 
-    cad_extrude(&c, 2);
-
-    cad_inset_face(&c, 1, .1);
-    cad_inset_face(&c, 0, .1);
-
-    cad_catmull_clark(&c);
-    cad_catmull_clark(&c);
-
-    cad_to_openSCAD("examples/glasses/glasses_shape.scad", c);
+    cad_scale(vec3(1, 1, 0), &flattened_glasses_shape);
+    //cad_catmull_clark(&flattened_glasses_shape);
+    // cad_to_openSCAD_module("examples/glasses/flattened_glasses_shape.scad", "flattened_glasses_shape", flattened_glasses_shape);
+    cad_to_openSCAD("examples/glasses/flattened_glasses_shape.scad", flattened_glasses_shape);
 
     return 0;
 }

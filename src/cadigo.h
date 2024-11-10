@@ -86,7 +86,7 @@ typedef struct {
 } CAD;
 
 void cad_free(CAD obj);
-CAD cad_copy(CAD obj);
+CAD cad_clone(CAD obj);
 
 CAD cad_polyhedron(Points points, Faces faces);
 CAD cad_polygon(Points points);
@@ -98,14 +98,14 @@ CAD __cad_polygon_from_points(size_t count, Vec3* points);
 CAD cad_cube(val_t l);
 
 // Operations - Similar Geometry
-CAD cad_translate(Vec3 v, CAD obj);
-CAD cad_rotate(Vec3 v, CAD obj);
-CAD cad_scale(Vec3 v, CAD obj);
+CAD* cad_translate(Vec3 v, CAD* obj);
+CAD* cad_rotate(Vec3 v, CAD* obj);
+CAD* cad_scale(Vec3 v, CAD* obj);
 
 // Operations - Topological Geometry
-CAD* cad_catmull_clark(CAD* obj);
+CAD* cad_catmull_clark3D(CAD* obj);
 
-CAD* cad_extrude(CAD* obj, double h);
+CAD* cad_extrude(double h, CAD* obj);
 
 // Operations - Booleans
 CAD cad_intersection(CAD obj);
@@ -325,10 +325,10 @@ void cad_print_points(CAD obj) {
     printf("\n");
 }
 
-CAD cad_translate(Vec3 v, CAD obj) {
-    for (size_t i = 0; i < obj.points.count; ++i) {
-        Vec3 old = obj.points.items[i];
-        obj.points.items[i] = vec3(old.x + v.x, old.y + v.y, old.z + v.z);
+CAD* cad_translate(Vec3 v, CAD* obj) {
+    for (size_t i = 0; i < obj->points.count; ++i) {
+        Vec3 old = obj->points.items[i];
+        obj->points.items[i] = vec3(old.x + v.x, old.y + v.y, old.z + v.z);
     }
     return obj;
 }
@@ -378,20 +378,20 @@ Vec3 vec3_rotate_yaw(ang_t yaw, Vec3 v) {
     return vec3(v1.first, v1.second, v.z);
 }
 
-CAD cad_rotate(Vec3 v, CAD obj) {
-    for (size_t i = 0; i < obj.points.count; ++i) {
-        obj.points.items[i] = vec3_rotate_roll (degs2rads(v.roll),  obj.points.items[i]);
-        obj.points.items[i] = vec3_rotate_pitch(degs2rads(v.pitch), obj.points.items[i]);
-        obj.points.items[i] = vec3_rotate_yaw  (degs2rads(v.yaw),   obj.points.items[i]);
+CAD* cad_rotate(Vec3 v, CAD* obj) {
+    for (size_t i = 0; i < obj->points.count; ++i) {
+        obj->points.items[i] = vec3_rotate_roll (degs2rads(v.roll),  obj->points.items[i]);
+        obj->points.items[i] = vec3_rotate_pitch(degs2rads(v.pitch), obj->points.items[i]);
+        obj->points.items[i] = vec3_rotate_yaw  (degs2rads(v.yaw),   obj->points.items[i]);
     }
     return obj;
 }
 
-CAD cad_scale(Vec3 v, CAD obj) {
-    for (size_t i=0; i < obj.points.count; ++i) {
-        obj.points.items[i].x *= v.x;
-        obj.points.items[i].y *= v.y;
-        obj.points.items[i].z *= v.z;
+CAD* cad_scale(Vec3 v, CAD* obj) {
+    for (size_t i=0; i < obj->points.count; ++i) {
+        obj->points.items[i].x *= v.x;
+        obj->points.items[i].y *= v.y;
+        obj->points.items[i].z *= v.z;
     }
     return obj;
 }
@@ -405,7 +405,7 @@ Face cad_copy_face(Face f) {
     return ret;
 }
 
-CAD cad_copy(CAD obj) {
+CAD cad_clone(CAD obj) {
     CAD ret;
     ret.points.count    = obj.points.count;
     ret.points.capacity = obj.points.capacity;
@@ -483,9 +483,12 @@ IndexPairs get_all_edges(CAD obj) {
     return edges;
 }
 
-IndexPair get_adjancent_face_indexes_to_edge(CAD obj, IndexPair edge) {
-    IndexPair ret;
-    bool collected_first = false;
+Indexes get_adjancent_face_indexes_to_edge(CAD obj, IndexPair edge) {
+    Indexes ret = {
+        .count = 0,
+        .capacity = 1,
+        .items = malloc(sizeof(size_t))
+    };
     for (size_t i = 0; i < obj.faces.count; ++i) {
         Face f = obj.faces.items[i];
         for (size_t j = 0; j < f.count; ++j) {
@@ -494,18 +497,17 @@ IndexPair get_adjancent_face_indexes_to_edge(CAD obj, IndexPair edge) {
                 .second = f.items[(j + 1) % f.count]
             };
             if (is_same_pair(current_edge, edge)) {
-                if (!collected_first) {
-                    ret.first  = i;
-                    collected_first = true;
-                } else {
-                    ret.second = i;
-                    return ret;
-                }
+                da_append(&ret, i);
+                if (ret.count >= 2) return ret;
             }
         }
     }
-    fprintf(stderr, "ERROR: Couldn't find two adjancent faces to the edge %zu - %zu\n", edge.first, edge.second);
-    exit(1);
+
+    if (ret.count == 0) {
+        fprintf(stderr, "ERROR: Couldn't find any adjacent face to the edge %zu - %zu\n", edge.first, edge.second);
+        exit(1);
+    }
+    return ret;
 }
 
 Indexes get_face_indexes_containing_point(CAD obj, size_t point_index) {
@@ -596,6 +598,7 @@ void print_face(Face f) {
 
 
 CAD* cad_catmull_clark(CAD* obj) {
+    assert(obj->faces.count > 1 && "ERROR: cad_catmull_clark is for polyhedron subdivision. Use another function for polygons.");
     const int original_point = 1;
     const int edge_point = 2;
     const int face_point = 3;
@@ -604,7 +607,7 @@ CAD* cad_catmull_clark(CAD* obj) {
     for (size_t i = 0; i < obj->points.count; ++i)
         obj->points.items[i].mark = original_point;
 
-    CAD old_object = cad_copy(*obj);
+    CAD old_object = cad_clone(*obj);
 
     // Face points
     Points face_points = {
@@ -628,19 +631,22 @@ CAD* cad_catmull_clark(CAD* obj) {
     IndexPairs original_edges = get_all_edges(*obj);
 
     for (size_t i = 0; i < original_edges.count; ++i) {
-        IndexPair adjancent_faces = get_adjancent_face_indexes_to_edge(old_object, original_edges.items[i]);
+        Indexes adjancent_faces = get_adjancent_face_indexes_to_edge(old_object, original_edges.items[i]);
 
-        cad_split_edge(obj, original_edges.items[i]); // edge point gets added at the end
+        cad_split_edge(obj, original_edges.items[i]); // edge point gets added at the end of the array
         Vec3 avg = vec3(0, 0, 0);
-        avg = vec3_add(avg, obj->points.items[original_edges.items[i].first]);
-        avg = vec3_add(avg, obj->points.items[original_edges.items[i].second]);
-        avg = vec3_add(avg, face_points.items[adjancent_faces.first]);
-        avg = vec3_add(avg, face_points.items[adjancent_faces.second]);
-        da_last(obj->points) = vec3_div_s(avg, 4);
-
+        int count = 0;
+        avg = vec3_add(avg, obj->points.items[original_edges.items[i].first]);  count += 1;
+        avg = vec3_add(avg, obj->points.items[original_edges.items[i].second]); count += 1;
+        for (size_t j = 0; j < adjancent_faces.count; ++j) {
+            avg = vec3_add(avg, face_points.items[adjancent_faces.items[j]]);
+            count += 1;
+        }
+        da_last(obj->points) = vec3_div_s(avg, count);
         da_last(obj->points).mark = edge_point;
     }
-
+    
+    // Original points get moved
     for (size_t i = 0; i < obj->points.count; ++i) {
         if (obj->points.items[i].mark != original_point) continue;
         
@@ -664,8 +670,8 @@ CAD* cad_catmull_clark(CAD* obj) {
         Vec3 new_point = vec3(0, 0, 0);
         new_point = vec3_add(new_point, vec3_mult_s(face_points_avg, 1));
         new_point = vec3_add(new_point, vec3_mult_s(edge_points_avg, 2));
-        new_point = vec3_add(new_point, vec3_mult_s(obj->points.items[i], touching_edge_indexes.count - 3));
-        new_point = vec3_div_s(new_point, touching_edge_indexes.count);
+        new_point = vec3_add(new_point, vec3_mult_s(obj->points.items[i], touching_face_indexes.count - 3));
+        new_point = vec3_div_s(new_point, touching_face_indexes.count);
 
         new_point.mark = original_point;
         obj->points.items[i] = new_point; 
@@ -686,7 +692,7 @@ CAD* cad_catmull_clark(CAD* obj) {
         Face old_face = obj->faces.items[i];
         da_append(&new_obj.points, face_points.items[i]); // Face point gets appended here
     
-        for (size_t j = 0; j < old_face.count; ++j) { // Making triangular faces instead of squares, should be the same thing.
+        for (size_t j = 0; j < old_face.count; ++j) {
             if (obj->points.items[old_face.items[j]].mark != edge_point) continue;
             Face new_face = {
                 .count = 0,
@@ -765,7 +771,7 @@ CAD* cad_clone_face_with_points(CAD* obj, size_t face_index) {
     return obj;
 }
 
-CAD* cad_extrude(CAD* obj, double h) {
+CAD* cad_extrude(double h, CAD* obj) {
     assert(obj->faces.count == 1);
     cad_clone_face_with_points(obj, 0);
     obj->faces.items[1] = reverse_face(obj->faces.items[1]);
@@ -787,7 +793,7 @@ Vec3 get_face_center(CAD obj, size_t face_index) {
     return vec3_div_s(sum, obj.faces.items[face_index].count);
 }
 
-CAD* cad_inset_face(CAD* obj, size_t face_index, val_t amount) {
+CAD* cad_inset_face(size_t face_index, val_t amount, CAD* obj) {
     assert(amount >= 0 && amount <= 1 && "Amount must be between 0 and 1.");
     assert(face_index < obj->faces.count && "face_index outside of range.");
     cad_clone_face_with_points(obj, face_index);
