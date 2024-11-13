@@ -112,6 +112,14 @@ CAD cad_intersection(CAD obj);
 CAD cad_difference(CAD obj);
 CAD cad_union(CAD obj);
 
+
+typedef struct {
+    Vec3 min;
+    Vec3 max;
+} Bounds;
+
+Bounds cad_get_bounds(CAD obj);
+
 #endif // CADIGO_H_
 
 
@@ -824,6 +832,93 @@ CAD* cad_inset_face(size_t face_index, val_t amount, CAD* obj) {
     free_face(obj->faces.items[face_index]);
     da_delete(&obj->faces, face_index);
     return obj;
+}
+
+void vec3_print(Vec3 v) {
+    printf("<%Lf, %Lf, %Lf>", v.x, v.y, v.z);
+}
+
+void vec3_println(Vec3 v) {
+    printf("<%Lf, %Lf, %Lf>\n", v.x, v.y, v.z);
+}
+
+CAD* cad_hotpoints_subdivision(CAD* obj) {
+    assert(obj->faces.count == 1 && "ERROR: object is not simple polygon.");
+    const double F = 1.0;
+    size_t j1, j2;
+
+    Points points;
+    points.count = obj->points.count * 2,
+    points.capacity = points.count + 1;
+    points.items = malloc(points.capacity * sizeof(Vec3));
+
+    Vec3 p1, p2, q1, q2;
+    int k = 0;
+    printf("obj->points.count = %zu\n", obj->points.count);
+    for (size_t j=0; j < obj->faces.items[0].count; ++j) {
+        j1 = (j+0) % obj->faces.items[0].count;
+        j2 = (j+1) % obj->faces.items[0].count;
+
+        p1 = obj->points.items[j1];
+        p2 = obj->points.items[j2];
+
+        double dx = p2.x - p1.x;
+        double dy = p2.y - p1.y;
+        double dz = p2.z - p1.z;
+
+        double radiX = dx / 2.82843; // 2 * 2^0.5 = 2.82843
+        double radiY = dy / 2.82843; //
+        double radiZ = dz / 2.82843; //
+
+        double ox = (p1.x + p2.x) / 2.0;
+        double oy = (p1.y + p2.y) / 2.0;
+        double oz = (p1.z + p2.z) / 2.0;
+
+
+        q1.x = ox - F * radiX / 1.41421; // sqrt(2) = 1.41421
+        q1.y = oy - F * radiY / 1.41421;
+        q1.z = oz - F * radiZ / 1.41421;
+        points.items[k] = q1; k += 1;
+
+        q2.x = ox + F * radiX / 1.41421;
+        q2.y = oy + F * radiY / 1.41421;
+        q2.z = oz + F * radiZ / 1.41421;
+        points.items[k] = q2; k += 1;
+        
+        vec3_println(p1);
+        vec3_println(p2);
+        printf("j2 = %zu\n", j2);
+    }
+
+    Face f;
+    f.count = points.count;
+    f.capacity = points.count;
+    f.items = (size_t*)malloc(sizeof(size_t)*points.count);
+    for (size_t i = 0; i < points.count; ++i)
+         f.items[i] = i;
+
+    free_face (obj->faces.items[0]);
+    free_points (obj->points);
+    obj->faces.items[0] = f;
+    obj->points = points;
+    return obj;
+}
+
+Bounds cad_get_bounds(CAD obj) {
+    Bounds ret = {
+        .min = vec3(INFINITY, INFINITY, INFINITY),
+        .max = vec3(-INFINITY, -INFINITY, -INFINITY)
+    };
+    for (size_t i = 0; i < obj.points.count; ++i) {
+        Vec3 p = obj.points.items[i];
+        if (p.x < ret.min.x) ret.min.x = p.x;
+        if (p.y < ret.min.y) ret.min.y = p.y;
+        if (p.z < ret.min.z) ret.min.z = p.z;
+        if (p.x > ret.max.x) ret.max.x = p.x;
+        if (p.y > ret.max.y) ret.max.y = p.y;
+        if (p.z > ret.max.z) ret.max.z = p.z;
+    }
+    return ret;
 }
 
 #endif // CADIGO_IMPLEMENTATION

@@ -58,16 +58,19 @@ int main() {
     cad_inset_face(0, .1, &extruded_glasses_shape);
     cad_catmull_clark(&extruded_glasses_shape);
     cad_catmull_clark(&extruded_glasses_shape);
-    //cad_to_openSCAD_module("examples/glasses/extruded_glasses_shape.scad", "extruded_glasses_shape", extruded_glasses_shape);
-    cad_to_openSCAD("examples/glasses/extruded_glasses_shape.scad", extruded_glasses_shape);
+    cad_translate(vec3(-cad_get_bounds(extruded_glasses_shape).max.x, 0, 0), &extruded_glasses_shape);
+    cad_to_openSCAD_module("examples/glasses/extruded_glasses_shape.scad", "extruded_glasses_shape", extruded_glasses_shape);
+    //cad_to_openSCAD("examples/glasses/extruded_glasses_shape.scad", extruded_glasses_shape);
 
 
     CAD flattened_glasses_shape = cad_clone(glasses_shape);
 
     cad_scale(vec3(1, 1, 0), &flattened_glasses_shape);
-    //cad_catmull_clark(&flattened_glasses_shape);
-    // cad_to_openSCAD_module("examples/glasses/flattened_glasses_shape.scad", "flattened_glasses_shape", flattened_glasses_shape);
-    cad_to_openSCAD("examples/glasses/flattened_glasses_shape.scad", flattened_glasses_shape);
+    cad_hotpoints_subdivision(&flattened_glasses_shape);
+    cad_hotpoints_subdivision(&flattened_glasses_shape);
+    cad_translate(vec3(-cad_get_bounds(flattened_glasses_shape).max.x, 0, 0), &flattened_glasses_shape);
+    cad_to_openSCAD_module("examples/glasses/flattened_glasses_shape.scad", "flattened_glasses_shape", flattened_glasses_shape);
+    //cad_to_openSCAD("examples/glasses/flattened_glasses_shape.scad", flattened_glasses_shape);
 
     return 0;
 }
