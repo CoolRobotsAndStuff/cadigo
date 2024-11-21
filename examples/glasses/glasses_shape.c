@@ -57,7 +57,7 @@ int main() {
     cad_inset_face(1, .1, &extruded_glasses_shape);
     cad_inset_face(0, .1, &extruded_glasses_shape);
     cad_catmull_clark(&extruded_glasses_shape);
-    cad_catmull_clark(&extruded_glasses_shape);
+    //cad_catmull_clark(&extruded_glasses_shape);
     cad_translate(vec3(-cad_get_bounds(extruded_glasses_shape).max.x, 0, 0), &extruded_glasses_shape);
     cad_to_openSCAD_module("examples/glasses/extruded_glasses_shape.scad", "extruded_glasses_shape", extruded_glasses_shape);
     //cad_to_openSCAD("examples/glasses/extruded_glasses_shape.scad", extruded_glasses_shape);
@@ -71,6 +71,33 @@ int main() {
     cad_translate(vec3(-cad_get_bounds(flattened_glasses_shape).max.x, 0, 0), &flattened_glasses_shape);
     cad_to_openSCAD_module("examples/glasses/flattened_glasses_shape.scad", "flattened_glasses_shape", flattened_glasses_shape);
     //cad_to_openSCAD("examples/glasses/flattened_glasses_shape.scad", flattened_glasses_shape);
+    
+    val_t normal_distribution(val_t x) {
+        val_t sigma = .4;
+        val_t mu = 0;
+        val_t coefficient = 1.0 / (sigma * sqrt(2.0 * M_PI));
+        val_t exponent = -((x - mu) * (x - mu)) / (2.0 * sigma * sigma);
+        return coefficient * exp(exponent);
+    }
+
+    val_t cad_cos(val_t x) { return (val_t)cos((val_t)x); }
+    val_t cad_sin(val_t x) { return (val_t)sin((val_t)x); }
+
+    //CAD bridge_curve = cad_xy_curve_from_function(normal_distribution, -0.8, 0.8, 30);
+
+    CAD bridge_curve = cad_xy_curve_from_function(cad_sin, -M_PI*1.5, M_PI*0.5, 30);
+    Bounds b = cad_get_bounds(bridge_curve);
+    Vec3 size = cad_get_size(bridge_curve);
+    cad_translate(vec3(-b.max.x + size.x /2, -b.min.y, 0), &bridge_curve);
+    cad_curve_to_polygon(&bridge_curve);
+    cad_to_openSCAD_module("examples/glasses/bridge_curve.scad", "bridge_curve", bridge_curve);
+    
+    cad_rotate(vec3(60, 0, 0), &extruded_glasses_shape);
+    while (true) {
+        cad_rotate(vec3(0, 10, 0), &extruded_glasses_shape);
+        cad_render_to_terminal(0.03, extruded_glasses_shape);
+        usleep(100000);
+    }
 
     return 0;
 }

@@ -6,9 +6,15 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdbool.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458700660631558817488152092096282925409171536436789259036001133053054882046652138414695194151160943305727036575959195309218611738193261179310511854807446237996274956735188575272489122793818301194912983367336244065664308602139494639522473719070217986094370277053921717629317675238467481846766940513200056812714526356082778577134275778960917363717872146844090122495343014654958537105079227968925892354201995611212902196086403441815981362977477130996051870721134999999837297804995105973173281609631859502445945534690830264252230825334468503526193118817101000313783875288658753320838142061717766914730359825349042875546873115956286388235378759375195778185778053217122680661300192787661119590921642019893809525720106548586327886593615338182796823030195203530185296899577362259941389124972177528347913151557485724245415069595082953311686172785588907509838175463746493931925506040092770167113900984882401285836160356370766010471018194295559619894676783744944825537977472684710404753464620804668425906949129331367702898915210475216205696602405803815019351125338243003558764024749647326391419927260426992279678235478163600934172164121992458631503028618297455570674983850549458858692699569092721079750930295532116534498720275596023648066549911988183479775356636980742654252786255181841757467289097777279380008164706001614524919217321721477235014144197356854816136115735255213347574184946843852332390739414333454776241686251898356948556209921922218427255025425688767179049460165346680498862723279178608578438382796797668145410095388378636095068006422512520511739298489608412848862694560424196528502221066118630674427862203919494504712371378696095636437191728746776465757396241389086583264599581339047802759009
+#endif
+
+#ifndef EPS
+#define EPS 0.000000000000000000000000000000000000001
 #endif
 
 #define NOT_IMPLEMENTED do { fprintf(stderr, "%s:%d: NOT_IMPLEMENTED\n", __FILE__, __LINE__); abort(); } while(0)
@@ -28,10 +34,12 @@ typedef struct {
 Vec3 vec3(val_t x, val_t y, val_t z);
 
 Vec3 vec3_add_s (Vec3 v1, val_t scalar);
+Vec3 vec3_sub_s (Vec3 v1, val_t scalar);
 Vec3 vec3_div_s (Vec3 v1, val_t scalar);
 Vec3 vec3_mult_s(Vec3 v1, val_t scalar);
 
 Vec3 vec3_add (Vec3 v1, Vec3 v2);
+Vec3 vec3_sub (Vec3 v1, Vec3 v2);
 Vec3 vec3_div (Vec3 v1, Vec3 v2);
 Vec3 vec3_mult(Vec3 v1, Vec3 v2);
 Vec3 vec3_avg (Vec3 v1, Vec3 v2);
@@ -144,6 +152,10 @@ Vec3 vec3_add_s(Vec3 v1, val_t scalar) {
     return vec3(v1.x + scalar, v1.y + scalar, v1.z + scalar);
 }
 
+Vec3 vec3_sub_s(Vec3 v1, val_t scalar) {
+    return vec3(v1.x - scalar, v1.y - scalar, v1.z - scalar);
+}
+
 Vec3 vec3_div_s(Vec3 v1, val_t scalar) {
     return vec3(v1.x / scalar, v1.y / scalar, v1.z / scalar);
 }
@@ -154,6 +166,10 @@ Vec3 vec3_mult_s(Vec3 v1, val_t scalar) {
 
 Vec3 vec3_add(Vec3 v1, Vec3 v2) {
     return vec3(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z);
+}
+
+Vec3 vec3_sub(Vec3 v1, Vec3 v2) {
+    return vec3(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z);
 }
 
 Vec3 vec3_div (Vec3 v1, Vec3 v2) {
@@ -784,8 +800,8 @@ CAD* cad_extrude(double h, CAD* obj) {
     cad_clone_face_with_points(obj, 0);
     obj->faces.items[1] = reverse_face(obj->faces.items[1]);
 
-    print_face(obj->faces.items[0]);
-    print_face(obj->faces.items[1]);
+    //print_face(obj->faces.items[0]);
+    //print_face(obj->faces.items[1]);
 
     for (size_t i = 0; i < obj->faces.items[1].count; ++i) {
         obj->points.items[obj->faces.items[1].items[i]] = vec3_add(vec3(0, 0, h), obj->points.items[obj->faces.items[1].items[i]]);
@@ -854,7 +870,7 @@ CAD* cad_hotpoints_subdivision(CAD* obj) {
 
     Vec3 p1, p2, q1, q2;
     int k = 0;
-    printf("obj->points.count = %zu\n", obj->points.count);
+    //printf("obj->points.count = %zu\n", obj->points.count);
     for (size_t j=0; j < obj->faces.items[0].count; ++j) {
         j1 = (j+0) % obj->faces.items[0].count;
         j2 = (j+1) % obj->faces.items[0].count;
@@ -885,9 +901,9 @@ CAD* cad_hotpoints_subdivision(CAD* obj) {
         q2.z = oz + F * radiZ / 1.41421;
         points.items[k] = q2; k += 1;
         
-        vec3_println(p1);
-        vec3_println(p2);
-        printf("j2 = %zu\n", j2);
+        //vec3_println(p1);
+        //vec3_println(p2);
+        //printf("j2 = %zu\n", j2);
     }
 
     Face f;
@@ -919,6 +935,195 @@ Bounds cad_get_bounds(CAD obj) {
         if (p.z > ret.max.z) ret.max.z = p.z;
     }
     return ret;
+}
+
+Vec3 cad_get_size(CAD obj) {
+    Bounds b = cad_get_bounds(obj);
+    return vec3_sub(b.max, b.min);
+}
+
+CAD cad_curve(Points points) {
+    CAD ret;
+    ret.faces  = (Faces){0};
+    // TODO should clone points maybe?
+    ret.points = points;
+    return ret;
+}
+
+Points cad_alloc_points(size_t count) {
+    Points ret = {
+        .count = count, 
+        .capacity = count+1,
+        .items = (Vec3*)malloc(sizeof(Vec3) * count)
+    };
+    return ret;
+}
+
+Faces cad_alloc_faces(size_t count) {
+    Faces ret = {
+        .count = count, 
+        .capacity = count+1,
+        .items = (Face*)malloc(sizeof(Face) * count)
+    };
+    return ret;
+}
+
+Face cad_alloc_face(size_t count) {
+    Face ret = {
+        .count = count, 
+        .capacity = count+1,
+        .items = (size_t*)malloc(sizeof(size_t) * count)
+    };
+    return ret;
+}
+
+CAD cad_xy_curve_from_function(val_t (*func)(val_t), val_t from, val_t to, size_t nsteps) {
+    CAD ret;
+    ret.faces  = (Faces){0};
+    ret.points = cad_alloc_points(nsteps+1);
+    for (size_t step = 0; step <= nsteps; ++step) {
+        val_t x = (to - from)/nsteps*step-to;
+        ret.points.items[step] = vec3(x, func(x), 0);
+    }
+    return ret;
+}
+
+CAD* cad_curve_to_polygon(CAD* curve) {
+    Face f = cad_alloc_face(curve->points.count);
+    for (size_t i = 0; i < curve->points.count; ++i)
+         f.items[i] = i;
+    curve->faces = cad_alloc_faces(1);
+    curve->faces.items[0] = f;
+    return curve;
+}
+
+#define swap_vecs(a, b) do { Vec3 t = (a); (a) = (b); (b) = (t);} while(0)
+
+val_t maxv(val_t x, val_t y) {
+    if (x > y) return x; else return y;
+}
+
+val_t minv(val_t x, val_t y) {
+    if (x < y) return x; else return y;
+}
+
+bool ray_from_point_intersects_edge_2D(Vec3 p, Vec3 a, Vec3 b) {
+    if (p.y > maxv(a.y, b.y)
+    ||  p.y < minv(a.y, b.y)
+    ||  p.x > maxv(a.x, b.x)
+    ||  p.x < minv(a.x, b.x)) return false;
+
+    if (a.y > b.y) swap_vecs(a, b);
+    return (b.y - a.y) / (b.x - a.x) < (p.y - a.y) / (p.x - a.x);
+}
+ 
+bool point_inside_face2D(Vec3 p, size_t face_index, CAD obj) {
+    bool is_inside = false;
+    assert(face_index < obj.faces.count && "Face index out of range.");
+    Face f = obj.faces.items[face_index];
+    for (size_t i = 0; i < f.count; ++i) {
+        Vec3 a = obj.points.items[f.items[(i + 0) % f.count]];
+        Vec3 b = obj.points.items[f.items[(i + 1) % f.count]];
+        if (ray_from_point_intersects_edge_2D(p, a, b)) {
+            is_inside = !is_inside;
+        }
+    }
+    return is_inside;
+}
+
+int maxi(int x, int y) {
+    if (x > y) return x; else return y;
+}
+
+int mini(int x, int y) {
+    if (x < y) return x; else return y;
+}
+
+void line(int w, int h, char* mat, 
+          int a_x, int a_y, 
+          int b_x, int b_y) {
+
+    int dx = abs(b_x - a_x), sx = a_x < b_x ? 1 : -1;
+    int dy = abs(b_y - a_y), sy = a_y < b_y ? 1 : -1;
+    int err = (dx > dy ? dx : -dy) / 2;
+
+    while (a_x != b_x || a_y != b_y) {
+        int e2 = err;
+        if (e2 > -dx) { err -= dy; a_x += sx; }
+        if (e2 <  dy) { err += dx; a_y += sy; }
+
+        if (a_x >= w) continue; 
+        if (a_y >= h) continue; 
+        if (a_x < 0) continue; 
+        if (a_y < 0) continue; 
+        mat[a_x + (a_y)*w] = 1;
+    }
+}
+
+void cad_render_to_terminal(val_t zoom, CAD obj) {
+    char chars[] = {' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'};
+    int chars_count = sizeof(chars) * sizeof(chars[0]);
+
+    struct winsize w; if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1) {perror("ioctl"); return;}
+    int width = w.ws_col;
+    int height = w.ws_row -1;
+
+    char* screen = calloc(width * height, sizeof(char));
+    for (int i = 0; i < width * height; ++i) screen[i] = -1;
+
+    CAD temp = cad_clone(obj);
+
+    cad_scale(vec3(2, 1, 1), &temp);
+
+    Bounds b = cad_get_bounds(temp);
+    Vec3 size = vec3_sub(b.max, b.min);
+
+    cad_translate(vec3_mult_s(b.min, -1), &temp);
+
+    val_t s = zoom * mini(height, width);
+    cad_scale(vec3(s, s, s), &temp);
+    cad_translate(vec3(1, 1, 1), &temp);
+
+    IndexPairs edges = get_all_edges(temp);
+    for (size_t i = 0; i < edges.count; ++i) {
+        line(width, height, screen, 
+             temp.points.items[edges.items[i].first].x,
+             temp.points.items[edges.items[i].first].y,
+             temp.points.items[edges.items[i].second].x,
+             temp.points.items[edges.items[i].second].y);
+    }
+
+    for (size_t i = 0; i < temp.points.count; ++i) {
+        Vec3 p = temp.points.items[i];
+
+        if (p.y < 0) continue; 
+        if (p.x < 0) continue; 
+        if (p.y >= height) continue;
+        if (p.x >= width ) continue;
+        
+        int x = p.x;
+        int y = p.y;
+
+        int c = p.z * (chars_count / size.z);
+        c = mini(c, chars_count-1);
+        c = maxi(c, 0);
+
+        screen[(y*width)+x] = maxi(screen[(y*width)+x], c);
+    }
+
+
+
+    printf("\033[H\033[2J");
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            if (screen[width * y + x] < 0) {
+                printf(" ");
+            } else {
+                printf("%c", chars[screen[width * y + x]]);
+            }
+        }
+        printf("\n");
+    }
 }
 
 #endif // CADIGO_IMPLEMENTATION

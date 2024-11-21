@@ -70,8 +70,8 @@ bool cad_fprint_openSCAD(FILE* file, const char* object_name, CAD obj) {
     sb_append("    ]\n);\n");
 
     Bounds b = cad_get_bounds(obj);
-    sb_printf("%s_min = [%.10Lf, %.10Lf, %.10Lf]\n", object_name, b.min.x, b.min.y, b.min.z);
-    sb_printf("%s_max = [%.10Lf, %.10Lf, %.10Lf]\n", object_name, b.max.x, b.max.y, b.max.z);
+    sb_printf("%s_min = [%.10Lf, %.10Lf, %.10Lf];\n", object_name, b.min.x, b.min.y, b.min.z);
+    sb_printf("%s_max = [%.10Lf, %.10Lf, %.10Lf];\n", object_name, b.max.x, b.max.y, b.max.z);
     fprintf(file, "%s", sb_to_string());
     return true;
 }
