@@ -1039,7 +1039,64 @@ int mini(int x, int y) {
     if (x < y) return x; else return y;
 }
 
-void line(int w, int h, char* mat, 
+typedef struct {
+    size_t width;
+    size_t height;
+    char* mat;
+    val_t* zbuffer;
+} ASCII_Screen;
+
+ASCII_Screen alloc_ascii_screen() {
+    struct winsize w; 
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1) {
+        perror("ioctl");
+        return (ASCII_Screen){0};
+    }
+
+    ASCII_Screen ret;
+    ret.width  = w.ws_col;
+    ret.height = w.ws_row-1;
+    ret.mat     = calloc(ret.width*ret.height, sizeof(char));
+    ret.zbuffer = calloc(ret.width*ret.height, sizeof(val_t));
+
+    for (size_t i = 0; i < ret.width * ret.height; ++i){
+        ret.mat[i] = ' ';
+        ret.zbuffer[i] = 0.0;
+    } 
+    return ret;
+}
+
+void free_ascii_screen(ASCII_Screen screen) {
+    free(screen.mat);
+    free(screen.zbuffer);
+}
+
+ang_t angle_between(int a_x, int a_y, int b_x, int b_y) {
+    return atan2(b_y - a_y, b_x - a_x);
+}
+
+char angle_to_line_char(ang_t angle_radians) {
+    ang_t margin = M_PI / 10.0;
+
+    if (fabsl( 0.0  - angle_radians) < margin) return '-';
+    if (fabsl( M_PI - angle_radians) < margin) return '-';
+    if (fabsl(-M_PI - angle_radians) < margin) return '-';
+
+    if (fabsl( M_PI/2 - angle_radians) < margin) return '|';
+    if (fabsl(-M_PI/2 - angle_radians) < margin) return '|';
+
+    if (angle_radians >  M_PI / 2 && angle_radians <  M_PI) return '/';
+    if (angle_radians > -M_PI / 2 &&  angle_radians < 0) return '/';
+
+    if (angle_radians >  M_PI / 2 && angle_radians <  M_PI) return '/';
+    if (angle_radians > -M_PI / 2 &&  angle_radians < 0) return '/';
+
+
+    return '\\';
+}
+
+
+void line(ASCII_Screen screen, 
           int a_x, int a_y, 
           int b_x, int b_y) {
 
@@ -1052,24 +1109,23 @@ void line(int w, int h, char* mat,
         if (e2 > -dx) { err -= dy; a_x += sx; }
         if (e2 <  dy) { err += dx; a_y += sy; }
 
-        if (a_x >= w) continue; 
-        if (a_y >= h) continue; 
+        if (a_x >= (int)screen.width) continue; 
+        if (a_y >= (int)screen.height) continue; 
         if (a_x < 0) continue; 
         if (a_y < 0) continue; 
-        mat[a_x + (a_y)*w] = 1;
+        screen.mat[a_x + (a_y)*screen.width] = angle_to_line_char(angle_between(
+            a_x, a_y, b_x, b_y
+        ));
+        screen.zbuffer[a_x + (a_y)*screen.width] = -10000.0;
     }
 }
 
 void cad_render_to_terminal(val_t zoom, CAD obj) {
-    char chars[] = {' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'};
+    char chars[] = {'.', ':', '-', '=', '+', '*', '#', '%', '@'};
     int chars_count = sizeof(chars) * sizeof(chars[0]);
 
-    struct winsize w; if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1) {perror("ioctl"); return;}
-    int width = w.ws_col;
-    int height = w.ws_row -1;
 
-    char* screen = calloc(width * height, sizeof(char));
-    for (int i = 0; i < width * height; ++i) screen[i] = -1;
+    ASCII_Screen screen = alloc_ascii_screen();
 
     CAD temp = cad_clone(obj);
 
@@ -1080,13 +1136,13 @@ void cad_render_to_terminal(val_t zoom, CAD obj) {
 
     cad_translate(vec3_mult_s(b.min, -1), &temp);
 
-    val_t s = zoom * mini(height, width);
+    val_t s = zoom * mini(screen.height, screen.width);
     cad_scale(vec3(s, s, s), &temp);
     cad_translate(vec3(1, 1, 1), &temp);
 
     IndexPairs edges = get_all_edges(temp);
     for (size_t i = 0; i < edges.count; ++i) {
-        line(width, height, screen, 
+        line(screen, 
              temp.points.items[edges.items[i].first].x,
              temp.points.items[edges.items[i].first].y,
              temp.points.items[edges.items[i].second].x,
@@ -1098,32 +1154,32 @@ void cad_render_to_terminal(val_t zoom, CAD obj) {
 
         if (p.y < 0) continue; 
         if (p.x < 0) continue; 
-        if (p.y >= height) continue;
-        if (p.x >= width ) continue;
-        
+        if (p.y >= screen.height) continue;
+        if (p.x >= screen.width ) continue;
+
         int x = p.x;
         int y = p.y;
 
-        int c = p.z * (chars_count / size.z);
-        c = mini(c, chars_count-1);
-        c = maxi(c, 0);
+        if (p.z > screen.zbuffer[x+(y*screen.width)]) {
+            int c = p.z * (chars_count / size.z);
+            c = mini(c, chars_count-1);
+            c = maxi(c, 0);
 
-        screen[(y*width)+x] = maxi(screen[(y*width)+x], c);
+            screen.mat[x+(y*screen.width)] = chars[c];
+        }
     }
 
 
 
     printf("\033[H\033[2J");
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            if (screen[width * y + x] < 0) {
-                printf(" ");
-            } else {
-                printf("%c", chars[screen[width * y + x]]);
-            }
+    for (int y = 0; y < screen.height; ++y) {
+        for (int x = 0; x < screen.width; ++x) {
+            printf("%c", screen.mat[screen.width*y + x]);
         }
         printf("\n");
     }
+
+    free_ascii_screen(screen);
 }
 
 #endif // CADIGO_IMPLEMENTATION

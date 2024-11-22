@@ -31,6 +31,17 @@ int main(int argc, char **argv) {
     );
     if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
 
+    nob_cmd_append(&cmd,
+                   "gcc",
+                   "-std=c11",
+                   "-Wall", "-Wextra",
+                   "-Isrc",
+                   "-o", "build/ascii_example",
+                   "examples/ascii.c",
+                   "-lm"
+    );
+    if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
+
     nob_cmd_append(&cmd, "./build/glasses_example");
     if (!nob_cmd_run_sync_and_reset(&cmd)) return 1;
 

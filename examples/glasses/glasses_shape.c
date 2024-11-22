@@ -91,11 +91,12 @@ int main() {
     cad_translate(vec3(-b.max.x + size.x /2, -b.min.y, 0), &bridge_curve);
     cad_curve_to_polygon(&bridge_curve);
     cad_to_openSCAD_module("examples/glasses/bridge_curve.scad", "bridge_curve", bridge_curve);
-    
+
     cad_rotate(vec3(60, 0, 0), &extruded_glasses_shape);
+
     while (true) {
-        cad_rotate(vec3(0, 10, 0), &extruded_glasses_shape);
-        cad_render_to_terminal(0.03, extruded_glasses_shape);
+        cad_rotate(vec3(0, 5, 0), &extruded_glasses_shape);
+        cad_render_to_terminal(0.04, extruded_glasses_shape);
         usleep(100000);
     }
 
