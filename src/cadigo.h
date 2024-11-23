@@ -572,7 +572,7 @@ IndexPairs get_all_edges_containing_point(CAD obj, size_t point_index) {
 
             // check for duplicate edges
             bool edge_already_exists = false;
-            for (size_t k; k < ret.count; ++k) { 
+            for (size_t k = 0; k < ret.count; ++k) { 
                 if (is_same_pair(ret.items[k], current_edge)) {
                     edge_already_exists = true;
                     break;
@@ -1172,8 +1172,8 @@ void cad_render_to_terminal(val_t zoom, CAD obj) {
 
 
     printf("\033[H\033[2J");
-    for (int y = 0; y < screen.height; ++y) {
-        for (int x = 0; x < screen.width; ++x) {
+    for (size_t y = 0; y < screen.height; ++y) {
+        for (size_t x = 0; x < screen.width; ++x) {
             printf("%c", screen.mat[screen.width*y + x]);
         }
         printf("\n");

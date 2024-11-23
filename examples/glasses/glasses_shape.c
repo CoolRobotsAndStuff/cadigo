@@ -5,6 +5,17 @@
 
 #include <stdio.h>
 
+val_t normal_distribution(val_t x) {
+    val_t sigma = .4;
+    val_t mu = 0;
+    val_t coefficient = 1.0 / (sigma * sqrt(2.0 * M_PI));
+    val_t exponent = -((x - mu) * (x - mu)) / (2.0 * sigma * sigma);
+    return coefficient * exp(exponent);
+}
+
+val_t cad_cos(val_t x) { return (val_t)cos((val_t)x); }
+val_t cad_sin(val_t x) { return (val_t)sin((val_t)x); }
+
 int main() {
     CAD glasses_shape = cad_polygon_from_points(
 
@@ -72,16 +83,6 @@ int main() {
     cad_to_openSCAD_module("examples/glasses/flattened_glasses_shape.scad", "flattened_glasses_shape", flattened_glasses_shape);
     //cad_to_openSCAD("examples/glasses/flattened_glasses_shape.scad", flattened_glasses_shape);
     
-    val_t normal_distribution(val_t x) {
-        val_t sigma = .4;
-        val_t mu = 0;
-        val_t coefficient = 1.0 / (sigma * sqrt(2.0 * M_PI));
-        val_t exponent = -((x - mu) * (x - mu)) / (2.0 * sigma * sigma);
-        return coefficient * exp(exponent);
-    }
-
-    val_t cad_cos(val_t x) { return (val_t)cos((val_t)x); }
-    val_t cad_sin(val_t x) { return (val_t)sin((val_t)x); }
 
     //CAD bridge_curve = cad_xy_curve_from_function(normal_distribution, -0.8, 0.8, 30);
 
