@@ -24,14 +24,41 @@
 typedef long double val_t;
 typedef val_t ang_t;
 
+typedef enum {
+    CAD_WHITE,
+    CAD_BLACK,
+    CAD_RED,
+    CAD_GREEN,
+    CAD_YELLOW,
+    CAD_BLUE,
+    CAD_PURPLE,
+    CAD_CYAN,
+    CAD_COLOR_COUNT
+} CAD_Color;
+
+static_assert(CAD_COLOR_COUNT == 8 && "Color count changed, add color ansii");
+
+char* color_ansii[8] = {
+    [CAD_WHITE ] = "\e[0;37m",
+    [CAD_BLACK ] = "\e[0;30m",
+    [CAD_RED   ] = "\e[0;31m",
+    [CAD_GREEN ] = "\e[0;32m",
+    [CAD_YELLOW] = "\e[0;33m",
+    [CAD_BLUE  ] = "\e[0;34m",
+    [CAD_PURPLE] = "\e[0;35m",
+    [CAD_CYAN  ] = "\e[0;36m"
+};
+
 typedef struct {
     union { val_t x; ang_t roll;  val_t first; };
     union { val_t y; ang_t pitch; val_t second;};
     union { val_t z; ang_t yaw;   val_t third;};
     int mark; // some algorithms are easier if you can just mark certain points;
+    CAD_Color color;
 } Vec3;
 
 Vec3 vec3(val_t x, val_t y, val_t z);
+Vec3 vec3_color(val_t x, val_t y, val_t z, CAD_Color c);
 
 Vec3 vec3_add_s (Vec3 v1, val_t scalar);
 Vec3 vec3_sub_s (Vec3 v1, val_t scalar);
@@ -104,6 +131,7 @@ CAD __cad_polygon_from_points(size_t count, Vec3* points);
 #define cad_polygon_from_points(...) __cad_polygon_from_points(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3)  , (Vec3[])  {__VA_ARGS__})
 
 CAD cad_cube(val_t l);
+CAD cad_square(val_t l);
 
 // Operations - Similar Geometry
 CAD* cad_translate(Vec3 v, CAD* obj);
@@ -145,38 +173,49 @@ Vec3 vec3(val_t x, val_t y, val_t z) {
     v.y = y;
     v.z = z;
     v.mark = 0;
+    v.color = CAD_WHITE;
+    return v;
+}
+
+Vec3 vec3_color(val_t x, val_t y, val_t z, CAD_Color c) {
+    Vec3 v;
+    v.x = x;
+    v.y = y;
+    v.z = z;
+    v.mark = 0;
+    v.color = c;
     return v;
 }
 
 Vec3 vec3_add_s(Vec3 v1, val_t scalar) {
-    return vec3(v1.x + scalar, v1.y + scalar, v1.z + scalar);
+    return vec3_color(v1.x + scalar, v1.y + scalar, v1.z + scalar, v1.color);
 }
 
 Vec3 vec3_sub_s(Vec3 v1, val_t scalar) {
-    return vec3(v1.x - scalar, v1.y - scalar, v1.z - scalar);
+    return vec3_color(v1.x - scalar, v1.y - scalar, v1.z - scalar, v1.color);
 }
 
 Vec3 vec3_div_s(Vec3 v1, val_t scalar) {
-    return vec3(v1.x / scalar, v1.y / scalar, v1.z / scalar);
+    return vec3_color(v1.x / scalar, v1.y / scalar, v1.z / scalar, v1.color);
 }
 
 Vec3 vec3_mult_s(Vec3 v1, val_t scalar) {
-    return vec3(v1.x * scalar, v1.y * scalar, v1.z * scalar);
+    return vec3_color(v1.x * scalar, v1.y * scalar, v1.z * scalar, v1.color);
 }
 
 Vec3 vec3_add(Vec3 v1, Vec3 v2) {
-    return vec3(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z);
+    return vec3_color(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z, v2.color);
 }
 
 Vec3 vec3_sub(Vec3 v1, Vec3 v2) {
-    return vec3(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z);
+    return vec3_color(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z, v2.color);
 }
 
 Vec3 vec3_div (Vec3 v1, Vec3 v2) {
-    return vec3(v1.x / v2.x, v1.y / v2.y, v1.z / v2.z);
+    return vec3_color(v1.x / v2.x, v1.y / v2.y, v1.z / v2.z, v2.color);
 }
 Vec3 vec3_mult(Vec3 v1, Vec3 v2) {
-    return vec3(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z);
+    return vec3_color(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z, v2.color);
 }
 
 Vec3 vec3_avg(Vec3 v1, Vec3 v2) {
@@ -309,6 +348,17 @@ CAD cad_line(Points points) {
     return (CAD){.points = points, .faces = (Faces){0}};
 }
 
+CAD cad_segment(Vec3 a, Vec3 b) {
+    return (CAD) {
+        .points = points(a, b),
+        .faces = faces(face(0, 1))
+    };
+}
+
+CAD cad_point_object(Vec3 p) {
+    return (CAD){.points = points(p), .faces = (Faces){0}};
+}
+
 CAD cad_cube(val_t l) {
     val_t a = l/2;
     CAD c = {
@@ -338,6 +388,22 @@ CAD cad_cube(val_t l) {
     return c;
 }
 
+CAD cad_square(val_t l) {
+    val_t a = l/2;
+    CAD s = {
+        .points = points(
+            vec3(-a, -a, 0),
+            vec3( a, -a, 0),
+            vec3( a,  a, 0),
+            vec3(-a,  a, 0)
+        ),
+        .faces = faces(
+            face(0, 1, 2, 3)
+        )
+    };
+    return s;
+}
+
 void cad_print_points(CAD obj) {
     for (size_t i = 0; i < obj.points.count; ++i) {
         printf("(%Lf, %Lf, %Lf), ", 
@@ -352,7 +418,7 @@ void cad_print_points(CAD obj) {
 CAD* cad_translate(Vec3 v, CAD* obj) {
     for (size_t i = 0; i < obj->points.count; ++i) {
         Vec3 old = obj->points.items[i];
-        obj->points.items[i] = vec3(old.x + v.x, old.y + v.y, old.z + v.z);
+        obj->points.items[i] = vec3_color(old.x + v.x, old.y + v.y, old.z + v.z, old.color);
     }
     return obj;
 }
@@ -385,21 +451,21 @@ Vec3 vec3_rotate_roll(ang_t roll, Vec3 v) {
     Polar2D yz_polar = xy_to_polar(v.y, v.z);
     yz_polar.ang += roll;
     Vec3 v1 = polar_to_vec2(yz_polar);
-    return vec3(v.x, v1.first, v1.second);
+    return vec3_color(v.x, v1.first, v1.second, v.color);
 }
 
 Vec3 vec3_rotate_pitch(ang_t pitch, Vec3 v) {
     Polar2D xz_polar = xy_to_polar(v.x, v.z);
     xz_polar.ang += pitch;
     Vec3 v1 = polar_to_vec2(xz_polar);
-    return vec3(v1.first, v.y, v1.second);
+    return vec3_color(v1.first, v.y, v1.second, v.color);
 }
 
 Vec3 vec3_rotate_yaw(ang_t yaw, Vec3 v) {
     Polar2D xy_polar = xy_to_polar(v.x, v.y);
     xy_polar.ang += yaw;
     Vec3 v1 = polar_to_vec2(xy_polar);
-    return vec3(v1.first, v1.second, v.z);
+    return vec3_color(v1.first, v1.second, v.z, v.color);
 }
 
 CAD* cad_rotate(Vec3 v, CAD* obj) {
@@ -1007,14 +1073,30 @@ val_t minv(val_t x, val_t y) {
     if (x < y) return x; else return y;
 }
 
-bool ray_from_point_intersects_edge_2D(Vec3 p, Vec3 a, Vec3 b) {
-    if (p.y > maxv(a.y, b.y)
-    ||  p.y < minv(a.y, b.y)
-    ||  p.x > maxv(a.x, b.x)
-    ||  p.x < minv(a.x, b.x)) return false;
+#define min(a, b) (a) < (b) ? (a) : (b)
+#define max(a, b) (a) > (b) ? (a) : (b)
 
-    if (a.y > b.y) swap_vecs(a, b);
-    return (b.y - a.y) / (b.x - a.x) < (p.y - a.y) / (p.x - a.x);
+bool ray_from_point_intersects_edge_2D(Vec3 p, Vec3 edge_a, Vec3 edge_b) {
+    Vec3 a = vec3_sub(edge_a, p);
+    Vec3 b = vec3_sub(edge_b, p);
+
+    if ((a.y < 0) && (b.y < 0)) return false;
+    if ((a.y > 0) && (b.y > 0)) return false;
+
+    val_t m = (b.y - a.y) / (b.x - a.x); // slope
+    
+    //        y = m * (x - a.x) + a.y
+    //        0 = m * (x - a.x) + a.y
+    //        0 = (m * x) - (m * a.x) + a.y
+    // -(m * x) = -(m * a.x) + a.y
+    val_t     x = ((m * a.x) - a.y) / m;
+
+    //printf("m: %LF\n", m);
+    //printf("x: %LF\n", x);
+
+    if (x < 0) return false;
+
+    return true;
 }
  
 bool point_inside_face2D(Vec3 p, size_t face_index, CAD obj) {
@@ -1025,6 +1107,7 @@ bool point_inside_face2D(Vec3 p, size_t face_index, CAD obj) {
         Vec3 a = obj.points.items[f.items[(i + 0) % f.count]];
         Vec3 b = obj.points.items[f.items[(i + 1) % f.count]];
         if (ray_from_point_intersects_edge_2D(p, a, b)) {
+            // puts("intersects");
             is_inside = !is_inside;
         }
     }
@@ -1044,6 +1127,7 @@ typedef struct {
     size_t height;
     char* mat;
     val_t* zbuffer;
+    CAD_Color* colors;
 } ASCII_Screen;
 
 ASCII_Screen alloc_ascii_screen() {
@@ -1058,12 +1142,22 @@ ASCII_Screen alloc_ascii_screen() {
     ret.height = w.ws_row-1;
     ret.mat     = calloc(ret.width*ret.height, sizeof(char));
     ret.zbuffer = calloc(ret.width*ret.height, sizeof(val_t));
+    ret.colors  = calloc(ret.width*ret.height, sizeof(CAD_Color));
 
     for (size_t i = 0; i < ret.width * ret.height; ++i){
         ret.mat[i] = ' ';
         ret.zbuffer[i] = 0.0;
+        ret.colors[i] = CAD_WHITE;
     } 
     return ret;
+}
+
+void cad_clear_ascii_screen(ASCII_Screen* screen) {
+    for (size_t i = 0; i < screen->width * screen->height; ++i){
+        screen->mat[i] = ' ';
+        screen->zbuffer[i] = 0.0;
+        screen->colors[i] = CAD_WHITE;
+    } 
 }
 
 void free_ascii_screen(ASCII_Screen screen) {
@@ -1120,12 +1214,10 @@ void line(ASCII_Screen screen,
     }
 }
 
-void cad_render_to_terminal(val_t zoom, CAD obj) {
+
+void cad_render_to_ascii_screen(ASCII_Screen* screen, val_t zoom, CAD obj) {
     char chars[] = {'.', ':', '-', '=', '+', '*', '#', '%', '@'};
     int chars_count = sizeof(chars) * sizeof(chars[0]);
-
-
-    ASCII_Screen screen = alloc_ascii_screen();
 
     CAD temp = cad_clone(obj);
 
@@ -1134,15 +1226,15 @@ void cad_render_to_terminal(val_t zoom, CAD obj) {
     Bounds b = cad_get_bounds(temp);
     Vec3 size = vec3_sub(b.max, b.min);
 
-    cad_translate(vec3_mult_s(b.min, -1), &temp);
+    //cad_translate(vec3_mult_s(b.min, -1), &temp);
 
-    val_t s = zoom * mini(screen.height, screen.width);
+    val_t s = zoom * mini(screen->height, screen->width);
     cad_scale(vec3(s, s, s), &temp);
-    cad_translate(vec3(1, 1, 1), &temp);
+    cad_translate(vec3(screen->width /2, screen->height/2, 1), &temp);
 
     IndexPairs edges = get_all_edges(temp);
     for (size_t i = 0; i < edges.count; ++i) {
-        line(screen, 
+        line(*screen, 
              temp.points.items[edges.items[i].first].x,
              temp.points.items[edges.items[i].first].y,
              temp.points.items[edges.items[i].second].x,
@@ -1154,32 +1246,45 @@ void cad_render_to_terminal(val_t zoom, CAD obj) {
 
         if (p.y < 0) continue; 
         if (p.x < 0) continue; 
-        if (p.y >= screen.height) continue;
-        if (p.x >= screen.width ) continue;
+        if (p.y >= screen->height) continue;
+        if (p.x >= screen->width ) continue;
 
         int x = p.x;
         int y = p.y;
 
-        if (p.z > screen.zbuffer[x+(y*screen.width)]) {
+        if (p.z > screen->zbuffer[x+(y*screen->width)]) {
             int c = p.z * (chars_count / size.z);
             c = mini(c, chars_count-1);
             c = maxi(c, 0);
 
-            screen.mat[x+(y*screen.width)] = chars[c];
+            screen->mat[x+(y*screen->width)] = chars[c];
+            screen->colors[x+(y*screen->width)] = p.color;
         }
     }
+}
 
-
-
+void cad_print_ascii_screen(ASCII_Screen screen) {
     printf("\033[H\033[2J");
     for (size_t y = 0; y < screen.height; ++y) {
         for (size_t x = 0; x < screen.width; ++x) {
-            printf("%c", screen.mat[screen.width*y + x]);
+            printf("%s%c\e[0m", color_ansii[screen.colors[x+(y*screen.width)]], screen.mat[x+(y*screen.width)]);
         }
         printf("\n");
     }
+}
 
+void cad_render_to_terminal(val_t zoom, CAD obj) {
+    ASCII_Screen screen = alloc_ascii_screen();
+    cad_render_to_ascii_screen(&screen, zoom, obj);
+    cad_print_ascii_screen(screen);
     free_ascii_screen(screen);
+}
+
+CAD* cad_color(CAD_Color c, CAD* obj) {
+    for (size_t i = 0; i < obj->points.count; ++i) {
+        obj->points.items[i].color = c;
+    }
+    return obj;
 }
 
 #endif // CADIGO_IMPLEMENTATION
