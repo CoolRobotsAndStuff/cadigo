@@ -10,37 +10,37 @@
 
 #endif // OPENSCAD_H_
 
-bool cad_to_openSCAD_module(const char* file_path, const char* module_name, CAD obj);
-bool cad_to_openSCAD(const char* file_path, const char* object_name, CAD obj);
+bool cad_to_openSCAD_module(CAD obj, const char* file_path, const char* module_name);
+bool cad_to_openSCAD(CAD obj, const char* file_path, const char* object_name);
 
-bool cad_fprint_openSCAD_module(FILE* file, const char* module_name, CAD obj);
-bool cad_fprint_openSCAD(FILE* file, const char* object_name, CAD obj);
+bool cad_fprint_openSCAD_module(FILE* file, CAD obj, const char* module_name);
+bool cad_fprint_openSCAD(FILE* file, CAD obj, const char* object_name);
 
-bool cad_to_openSCAD(const char* file_path, const char* object_name, CAD obj) {
+bool cad_to_openSCAD(CAD obj, const char* file_path, const char* object_name) {
     FILE* program_file;
     program_file = fopen(file_path, "w");
     if (program_file == NULL) {
         perror("Could not open file.");
         return false;
     }
-    cad_fprint_openSCAD(program_file, object_name, obj);
+    cad_fprint_openSCAD(program_file, obj, object_name);
     fclose(program_file);
     return true;
 }
 
-bool cad_to_openSCAD_module(const char* file_path, const char* module_name, CAD obj){
+bool cad_to_openSCAD_module(CAD obj, const char* file_path, const char* module_name){
     FILE* program_file;
     program_file = fopen(file_path, "w");
     if (program_file == NULL) {
         perror("Could not open file.");
         return false;
     }
-    cad_fprint_openSCAD_module(program_file, module_name, obj);
+    cad_fprint_openSCAD_module(program_file, obj,  module_name);
     fclose(program_file);
     return true;
 }
 
-bool cad_fprint_openSCAD(FILE* file, const char* object_name, CAD obj) {
+bool cad_fprint_openSCAD(FILE* file, CAD obj, const char* object_name) {
     bool is_polygon = obj.faces.count == 1;
     sb_clear();
     if (is_polygon) sb_append("polygon(\n");
@@ -76,7 +76,7 @@ bool cad_fprint_openSCAD(FILE* file, const char* object_name, CAD obj) {
     return true;
 }
 
-bool cad_fprint_openSCAD_module(FILE* file, const char* module_name, CAD obj) {
+bool cad_fprint_openSCAD_module(FILE* file, CAD obj, const char* module_name) {
     bool is_polygon = obj.faces.count == 1;
     sb_clear();
     sb_printf("module %s(){\n", module_name);
