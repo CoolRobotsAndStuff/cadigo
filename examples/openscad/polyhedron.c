@@ -14,7 +14,7 @@ int main() {
             &c
     ))));
 
-    cad_to_openSCAD(c, "examples/openscad/example_polyhedron.scad", "polyhedron");
+    cad_to_openSCAD(c, "examples/openscad/polyhedron.scad", "polyhedron");
 
     return 0;
 }
