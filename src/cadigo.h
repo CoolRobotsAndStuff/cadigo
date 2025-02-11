@@ -25,6 +25,33 @@
 typedef long double val_t;
 typedef val_t ang_t;
 
+#define ASS_INIT_CAP 100
+
+#define __ass_get         for (size_t i = 0; i < ass.count; ++i) if (ass.keys[i] == key) return ass.vals[i];
+#define __ass_get_inverse for (size_t i = 0; i < ass.count; ++i) if (ass.vals[i] == val) return ass.keys[i];
+#define __ass_set(default_value)                                               \
+    if (ass->count >= ass->capacity) {                                         \
+        ass->capacity = ass->capacity == 0 ? ASS_INIT_CAP : ass->capacity*2;   \
+        ass->vals = realloc(ass->vals, ass->capacity * sizeof(*ass->vals)); \
+        ass->keys = realloc(ass->keys, ass->capacity * sizeof(*ass->keys)); \
+    }                                                                          \
+    ass->keys[ass->count] = key;                                               \
+    ass->vals[ass->count] = val;                                               \
+    ass->count++;                                                              \
+    ass->vals[ass->count] = (default_value);                                 \
+
+typedef struct {
+    size_t capacity;
+    size_t count;
+    size_t* keys;
+    size_t* vals;
+} ZuZuAss; // (A very shitty associative array, pun intended)
+
+size_t zu_zu_ass_get(ZuZuAss ass, size_t key)            { __ass_get         }
+size_t zu_zu_ass_get_inverse(ZuZuAss ass, size_t val)    { __ass_get_inverse }
+void zu_zu_ass_set(ZuZuAss* ass, size_t key, size_t val) { __ass_set(-1)     }
+
+
 typedef enum {
     CAD_WHITE,
     CAD_BLACK,
@@ -145,6 +172,7 @@ CAD* cad_catmull_clark3D(CAD* obj);
 CAD* cad_extrude(CAD* obj, double h);
 
 // Operations - Booleans
+CAD* cad_substract(CAD* obj1, CAD* obj2);
 CAD cad_intersection(CAD obj);
 CAD cad_difference(CAD obj);
 CAD cad_union(CAD obj);
@@ -1074,8 +1102,8 @@ val_t minv(val_t x, val_t y) {
     if (x < y) return x; else return y;
 }
 
-#define min(a, b) (a) < (b) ? (a) : (b)
-#define max(a, b) (a) > (b) ? (a) : (b)
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#define max(a, b) ((a) > (b) ? (a) : (b))
 
 bool ray_from_point_intersects_edge_2D(Vec3 p, Vec3 edge_a, Vec3 edge_b) {
     Vec3 a = vec3_sub(edge_a, p);
@@ -1084,16 +1112,20 @@ bool ray_from_point_intersects_edge_2D(Vec3 p, Vec3 edge_a, Vec3 edge_b) {
     if ((a.y < 0) && (b.y < 0)) return false;
     if ((a.y > 0) && (b.y > 0)) return false;
 
+    // Prevent failure with perfectly straight lines
+    if (a.x == b.x) b.x += 0.000000000000001;
+    if (a.y == b.y) b.y += 0.000000000000001;
+
     val_t m = (b.y - a.y) / (b.x - a.x); // slope
-    
+
     //        y = m * (x - a.x) + a.y
     //        0 = m * (x - a.x) + a.y
     //        0 = (m * x) - (m * a.x) + a.y
     // -(m * x) = -(m * a.x) + a.y
     val_t     x = ((m * a.x) - a.y) / m;
 
-    //printf("m: %LF\n", m);
-    //printf("x: %LF\n", x);
+    printf("m: %LF\n", m);
+    printf("x: %LF\n", x);
 
     if (x < 0) return false;
 
@@ -1108,7 +1140,6 @@ bool point_inside_face2D(Vec3 p, size_t face_index, CAD obj) {
         Vec3 a = obj.points.items[f.items[(i + 0) % f.count]];
         Vec3 b = obj.points.items[f.items[(i + 1) % f.count]];
         if (ray_from_point_intersects_edge_2D(p, a, b)) {
-            // puts("intersects");
             is_inside = !is_inside;
         }
     }
@@ -1286,6 +1317,134 @@ CAD* cad_color(CAD* obj, CAD_Color c) {
         obj->points.items[i].color = c;
     }
     return obj;
+}
+
+// Given three collinear points p, q, r, the function checks if point q lies on line segment 'pr' 
+bool point_lies_on_segment(Vec3 q, Vec3 p, Vec3 r) { 
+    if (q.x <= max(p.x, r.x) && q.x >= min(p.x, r.x)
+    &&  q.y <= max(p.y, r.y) && q.y >= min(p.y, r.y)) return true; 
+    return false; 
+} 
+
+typedef enum {
+    ORIENT_COLLINEAR,
+    ORIENT_CLOCKWISE,
+    ORIENT_COUNTER_CLOCKWISE,
+} Orient;
+
+Orient get_orientation(Vec3 p, Vec3 q, Vec3 r) {
+    // https://www.geeksforgeeks.org/orientation-3-ordered-points/ 
+    int val = (q.y-p.y) * (r.x-q.x) - (q.x-p.x) * (r.y-q.y); 
+    if (val == 0) return ORIENT_COLLINEAR;
+    if (val >  0) return ORIENT_CLOCKWISE;
+    return ORIENT_COUNTER_CLOCKWISE;
+}
+
+bool cad_segments_intersect(Vec3 a1, Vec3 b1, Vec3 a2, Vec3 b2) { 
+    Orient a1_b1_a2_orientation = get_orientation(a1, b1, a2);  
+    Orient a1_b1_b2_orientation = get_orientation(a1, b1, b2);  
+    Orient a2_b2_a1_orientation = get_orientation(a2, b2, a1);
+    Orient a2_b2_b1_orientation = get_orientation(a2, b2, b1);
+
+    if (a1_b1_a2_orientation != a1_b1_b2_orientation 
+    &&  a2_b2_a1_orientation != a2_b2_b1_orientation) return true; 
+  
+    if ((a1_b1_a2_orientation == ORIENT_COLLINEAR && point_lies_on_segment(a1, b1, a2))
+    ||  (a1_b1_b2_orientation == ORIENT_COLLINEAR && point_lies_on_segment(a1, b1, b2))
+    ||  (a2_b2_a1_orientation == ORIENT_COLLINEAR && point_lies_on_segment(a2, b2, a1))
+    ||  (a2_b2_b1_orientation == ORIENT_COLLINEAR && point_lies_on_segment(a2, b2, b1))) return true; 
+    return false;
+}
+
+Vec3 cad_line_intersection(Vec3 p1, Vec3 p2, Vec3 p3, Vec3 p4) {
+    val_t A1 = p2.y - p1.y;
+    val_t B1 = p1.x - p2.x;
+    val_t C1 = A1 * p1.x + B1 * p1.y;
+
+    val_t A2 = p4.y - p3.y;
+    val_t B2 = p3.x - p4.x;
+    val_t C2 = A2 * p3.x + B2 * p3.y;
+
+    val_t determinant = A1 * B2 - A2 * B1;
+
+    // if the lines are parallel
+    if (determinant == 0) {
+        return (Vec3){ .x=INFINITY, .y=INFINITY };
+    } else {
+        return (Vec3){
+            .x = (B2 * C1 - B1 * C2) / determinant,
+            .y = (A1 * C2 - A2 * C1) / determinant
+        };
+    }
+}
+
+CAD* cad_substract(CAD* obj1, CAD* obj2) {
+    const int mark_inside = 1;
+    const int mark_outside = 2;
+    
+    ZuZuAss obj2_to_obj1 = {0};
+
+    Face* face1 = &obj1->faces.items[0];
+    for (size_t face_i = 0; face_i < face1->count; ++face_i) {
+        size_t i = face1->items[face_i]; 
+        if (point_inside_face2D(obj1->points.items[i], 0, *obj2)){
+            puts("hell0");
+            obj1->points.items[i].mark = mark_inside;
+            obj1->points.items[i].color = CAD_RED;
+        } else {
+            obj1->points.items[i].mark = mark_outside;
+            obj1->points.items[i].color = CAD_CYAN;
+        }
+    }
+
+    Face* face2 = &obj2->faces.items[0];
+    for (size_t face_i = 0; face_i < face2->count; ++face_i) {
+        size_t i = face2->items[face_i]; 
+        if (point_inside_face2D(obj2->points.items[i], 0, *obj1)){
+            obj2->points.items[i].mark = mark_inside;
+            obj2->points.items[i].color = CAD_RED;
+            da_append(&obj1->points, obj2->points.items[i]);
+            zu_zu_ass_set(&obj2_to_obj1, i, da_last_index(obj2->points));
+        } else {
+            obj2->points.items[i].mark = mark_outside;
+            obj2->points.items[i].color = CAD_CYAN;
+        }
+    }
+
+    size_t c1 = face1->count;
+    size_t c2 = face2->count;
+
+    for (size_t face1_i = 0; face1_i < c1; ++face1_i) {
+        size_t i1 = face1->items[ face1_i];
+        size_t i2 = face1->items[(face1_i+1)%c1];
+        Vec3 obj1_a = obj1->points.items[i1];
+        Vec3 obj1_b = obj1->points.items[i2];
+        if (obj1_a.mark != obj1_b.mark) {
+            for (size_t face2_i = 0; face2_i < c2; ++face2_i) {
+                size_t j1 = face2->items[ face2_i];
+                size_t j2 = face2->items[(face2_i+1)%c2];
+                Vec3 obj2_a = obj2->points.items[j1];
+                Vec3 obj2_b = obj2->points.items[j2];
+
+                if (cad_segments_intersect(obj1_a, obj1_b, obj2_a, obj2_b)) {
+                    Vec3 p = cad_line_intersection(obj1_a, obj1_b, obj2_a, obj2_b);
+                    p.color = CAD_PURPLE;
+                    da_append(&obj1->points, p);
+                    if (obj1_a.mark == mark_outside) {
+                        da_insert(face1, face1_i, da_last_index(obj1->points));
+                    } else if (obj1_b.mark == mark_outside) {
+                        da_insert(face1, (face2_i+1)%c2, da_last_index(obj1->points));
+                    } else {
+                        assert(false && "UNREACHABLE");
+                    }
+                }
+            }
+        }
+
+    }
+
+    return obj1;
+
 }
 
 #endif // CADIGO_IMPLEMENTATION

@@ -8,13 +8,14 @@
 #include "../cadigo.h"
 #include "../scratch_buffer.c"
 
-#endif // OPENSCAD_H_
 
 bool cad_to_openSCAD_module(CAD obj, const char* file_path, const char* module_name);
 bool cad_to_openSCAD(CAD obj, const char* file_path, const char* object_name);
 
 bool cad_fprint_openSCAD_module(FILE* file, CAD obj, const char* module_name);
 bool cad_fprint_openSCAD(FILE* file, CAD obj, const char* object_name);
+
+#endif // OPENSCAD_H_
 
 bool cad_to_openSCAD(CAD obj, const char* file_path, const char* object_name) {
     FILE* program_file;
