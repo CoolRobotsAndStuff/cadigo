@@ -10,6 +10,9 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#define max(a, b) ((a) > (b) ? (a) : (b))
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458700660631558817488152092096282925409171536436789259036001133053054882046652138414695194151160943305727036575959195309218611738193261179310511854807446237996274956735188575272489122793818301194912983367336244065664308602139494639522473719070217986094370277053921717629317675238467481846766940513200056812714526356082778577134275778960917363717872146844090122495343014654958537105079227968925892354201995611212902196086403441815981362977477130996051870721134999999837297804995105973173281609631859502445945534690830264252230825334468503526193118817101000313783875288658753320838142061717766914730359825349042875546873115956286388235378759375195778185778053217122680661300192787661119590921642019893809525720106548586327886593615338182796823030195203530185296899577362259941389124972177528347913151557485724245415069595082953311686172785588907509838175463746493931925506040092770167113900984882401285836160356370766010471018194295559619894676783744944825537977472684710404753464620804668425906949129331367702898915210475216205696602405803815019351125338243003558764024749647326391419927260426992279678235478163600934172164121992458631503028618297455570674983850549458858692699569092721079750930295532116534498720275596023648066549911988183479775356636980742654252786255181841757467289097777279380008164706001614524919217321721477235014144197356854816136115735255213347574184946843852332390739414333454776241686251898356948556209921922218427255025425688767179049460165346680498862723279178608578438382796797668145410095388378636095068006422512520511739298489608412848862694560424196528502221066118630674427862203919494504712371378696095636437191728746776465757396241389086583264599581339047802759009
 #endif
@@ -27,18 +30,24 @@ typedef val_t ang_t;
 
 #define ASS_INIT_CAP 100
 
-#define __ass_get         for (size_t i = 0; i < ass.count; ++i) if (ass.keys[i] == key) return ass.vals[i];
-#define __ass_get_inverse for (size_t i = 0; i < ass.count; ++i) if (ass.vals[i] == val) return ass.keys[i];
+#define __ass_get(default_value)                                                       \
+    for (size_t i = 0; i < ass.count; ++i) if (ass.keys[i] == key) return ass.vals[i]; \
+    return (default_value);
+
+#define __ass_get_inverse(default_value)                                               \
+    for (size_t i = 0; i < ass.count; ++i) if (ass.vals[i] == val) return ass.keys[i]; \
+    return (default_value);
+
 #define __ass_set(default_value)                                               \
     if (ass->count >= ass->capacity) {                                         \
         ass->capacity = ass->capacity == 0 ? ASS_INIT_CAP : ass->capacity*2;   \
-        ass->vals = realloc(ass->vals, ass->capacity * sizeof(*ass->vals)); \
-        ass->keys = realloc(ass->keys, ass->capacity * sizeof(*ass->keys)); \
+        ass->vals = realloc(ass->vals, ass->capacity * sizeof(*ass->vals));    \
+        ass->keys = realloc(ass->keys, ass->capacity * sizeof(*ass->keys));    \
     }                                                                          \
     ass->keys[ass->count] = key;                                               \
     ass->vals[ass->count] = val;                                               \
     ass->count++;                                                              \
-    ass->vals[ass->count] = (default_value);                                 \
+    ass->vals[ass->count] = (default_value);                                   \
 
 typedef struct {
     size_t capacity;
@@ -47,9 +56,9 @@ typedef struct {
     size_t* vals;
 } ZuZuAss; // (A very shitty associative array, pun intended)
 
-size_t zu_zu_ass_get(ZuZuAss ass, size_t key)            { __ass_get         }
-size_t zu_zu_ass_get_inverse(ZuZuAss ass, size_t val)    { __ass_get_inverse }
-void zu_zu_ass_set(ZuZuAss* ass, size_t key, size_t val) { __ass_set(-1)     }
+size_t zu_zu_ass_get(ZuZuAss ass, size_t key)            { __ass_get(0)        }
+size_t zu_zu_ass_get_inverse(ZuZuAss ass, size_t val)    { __ass_get_inverse(0)}
+void zu_zu_ass_set(ZuZuAss* ass, size_t key, size_t val) { __ass_set(-1)       }
 
 
 typedef enum {
@@ -99,6 +108,21 @@ Vec3 vec3_div (Vec3 v1, Vec3 v2);
 Vec3 vec3_mult(Vec3 v1, Vec3 v2);
 Vec3 vec3_avg (Vec3 v1, Vec3 v2);
 
+Vec3* vec3_add_to  (Vec3* v1, Vec3 v2);
+Vec3* vec3_div_by_s(Vec3* v1, val_t scalar);
+
+
+typedef struct {
+    union { int x; int roll;  int first; };
+    union { int y; int pitch; int second;};
+    union { int z; int yaw;   int third;};
+    int mark; // some algorithms are easier if you can just mark certain points;
+    CAD_Color color;
+} Vec3i;
+
+Vec3i vec3i(int x, int y, int z);
+Vec3i* vec3i_add_to(Vec3i* v1, Vec3i v2);
+Vec3i vec3i_add(Vec3i v1, Vec3i v2);
 
 typedef struct {
     val_t mag;
@@ -171,6 +195,7 @@ CAD* cad_catmull_clark3D(CAD* obj);
 
 CAD* cad_extrude(CAD* obj, double h);
 
+Vec3 cad_calculate_face_normal(CAD obj, size_t face_index);
 // Operations - Booleans
 CAD* cad_substract(CAD* obj1, CAD* obj2);
 CAD cad_intersection(CAD obj);
@@ -184,6 +209,14 @@ typedef struct {
 } Bounds;
 
 Bounds cad_get_bounds(CAD obj);
+
+typedef struct {
+    size_t width;
+    size_t height;
+    char* mat;
+    val_t* zbuffer;
+    CAD_Color* colors;
+} ASCII_Screen;
 
 #endif // CADIGO_H_
 
@@ -249,6 +282,37 @@ Vec3 vec3_mult(Vec3 v1, Vec3 v2) {
 
 Vec3 vec3_avg(Vec3 v1, Vec3 v2) {
     return vec3_div_s(vec3_add(v1, v2), 2);
+}
+
+Vec3* vec3_div_by_s(Vec3* v1, val_t scalar) {
+    v1->x /= scalar;
+    v1->y /= scalar;
+    v1->z /= scalar;
+    return v1;
+}
+
+Vec3i vec3i(int x, int y, int z) {
+    Vec3i v;
+    v.x = x;
+    v.y = y;
+    v.z = z;
+    v.mark = 0;
+    v.color = 0;
+    return v;
+}
+
+Vec3i* vec3i_add_to(Vec3i* v1, Vec3i v2) {
+    v1->x += v2.x;
+    v1->y += v2.y;
+    v1->z += v2.z;
+    return v1;
+}
+
+Vec3i vec3i_add(Vec3i v1, Vec3i v2) {
+    v1.x += v2.x;
+    v1.y += v2.y;
+    v1.z += v2.z;
+    return v1;
 }
 
 Face __face(size_t count, size_t* indexes) {
@@ -945,6 +1009,31 @@ CAD* cad_inset_face(CAD* obj, size_t face_index, val_t amount) {
     return obj;
 }
 
+Vec3 cad_calculate_face_normal(CAD obj, size_t face_index) {
+    assert(face_index < obj.faces.count);
+    Face f = obj.faces.items[face_index];
+    assert(f.count >= 3 && "invalid face");
+
+    Vec3 v1 = obj.points.items[f.items[0]];
+    Vec3 v2 = obj.points.items[f.items[1]];
+    Vec3 v3 = obj.points.items[f.items[2]];
+
+    Vec3 edge1 = vec3(v2.x - v1.x, v2.y - v1.y, v2.z - v1.z);
+    Vec3 edge2 = vec3(v3.x - v1.x, v3.y - v1.y, v3.z - v1.z);
+
+    // Cross product
+    Vec3 normal = vec3(
+        edge1.y * edge2.z - edge1.z * edge2.y,
+        edge1.z * edge2.x - edge1.x * edge2.z,
+        edge1.x * edge2.y - edge1.y * edge2.x
+    );
+
+    // Normalize
+    val_t length = sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+    if (length > 0.0001) vec3_div_by_s(&normal, length);
+    return normal;
+}
+
 void vec3_print(Vec3 v) {
     printf("<%Lf, %Lf, %Lf>", v.x, v.y, v.z);
 }
@@ -1102,8 +1191,6 @@ val_t minv(val_t x, val_t y) {
     if (x < y) return x; else return y;
 }
 
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#define max(a, b) ((a) > (b) ? (a) : (b))
 
 bool ray_from_point_intersects_edge_2D(Vec3 p, Vec3 edge_a, Vec3 edge_b) {
     Vec3 a = vec3_sub(edge_a, p);
@@ -1153,14 +1240,6 @@ int maxi(int x, int y) {
 int mini(int x, int y) {
     if (x < y) return x; else return y;
 }
-
-typedef struct {
-    size_t width;
-    size_t height;
-    char* mat;
-    val_t* zbuffer;
-    CAD_Color* colors;
-} ASCII_Screen;
 
 ASCII_Screen alloc_ascii_screen() {
     struct winsize w; 
@@ -1262,7 +1341,7 @@ void cad_render_to_ascii_screen(ASCII_Screen* screen, val_t zoom, CAD obj) {
 
     val_t s = zoom * mini(screen->height, screen->width);
     cad_scale(&temp, vec3(s, s, s));
-    cad_translate(&temp, vec3(screen->width /2, screen->height/2, 1));
+    cad_translate(&temp, vec3(screen->width/2, screen->height/2, 1));
 
     IndexPairs edges = get_all_edges(temp);
     for (size_t i = 0; i < edges.count; ++i) {

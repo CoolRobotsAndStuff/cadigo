@@ -5,7 +5,7 @@
 
 #define streq(s1, s2) (strcmp((s1), (s2)) == 0) 
 
-bool build(const char* src, const char* dst) {
+bool build(const char* src, const char* dst, bool rgfw) {
     Nob_Cmd cmd = {0};
     nob_cmd_append(&cmd,
                    "gcc",
@@ -16,6 +16,8 @@ bool build(const char* src, const char* dst) {
                    src,
                    "-lm"
     );
+    if (rgfw) nob_cmd_append(&cmd, "-lX11", "-lGL", "-lXrandr");
+
     return nob_cmd_run_sync_and_reset(&cmd);
 
 } 
@@ -31,6 +33,7 @@ int main(int argc, char **argv) {
     bool run = false;
     char* src = "";
     char* dst = "";
+    bool rgfw = false;
     while (argc > 0) {
         const char *cmd_or_target = nob_shift_args(&argc, &argv);
         if (streq(cmd_or_target, "run")) {
@@ -44,6 +47,7 @@ int main(int argc, char **argv) {
         else if (streq(cmd_or_target, "glasses")) {
             src = "examples/glasses/glasses.c";
             dst = "./build/glasses";
+            rgfw = true;
         }
         else if (streq(cmd_or_target, "vertex_is_inside")) {
             src = "examples/vertex_is_inside.c";
@@ -53,12 +57,21 @@ int main(int argc, char **argv) {
             src = "examples/2d_boolean.c";
             dst = "./build/2d_boolean";
         }
+        else if (streq(cmd_or_target, "voxels")) {
+            src = "examples/voxels.c";
+            dst = "./build/voxels";
+        }
+        else if (streq(cmd_or_target, "visualizer")) {
+            src = "examples/visualizer.c";
+            dst = "./build/visualizer";
+            rgfw = true;
+        }
         else  {
             nob_log(NOB_ERROR, "Unknown cmd or target %s", cmd_or_target);
             return 1;
         }
     }
-    if (!build(src, dst)) return 1;
+    if (!build(src, dst, rgfw)) return 1;
 
     
     if (run) {

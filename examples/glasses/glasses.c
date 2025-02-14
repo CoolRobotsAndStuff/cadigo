@@ -1,4 +1,5 @@
 #include "extensions/openscad.h"
+#include "extensions/visualizer.h"
 
 #define CADIGO_IMPLEMENTATION
 #include "cadigo.h"
@@ -15,6 +16,8 @@ val_t normal_distribution(val_t x) {
 
 val_t cad_cos(val_t x) { return (val_t)cos((val_t)x); }
 val_t cad_sin(val_t x) { return (val_t)sin((val_t)x); }
+
+#define VISUALIZE true
 
 int main() {
     CAD glasses_shape = cad_polygon_from_points(
@@ -96,11 +99,15 @@ int main() {
     cad_rotate(&extruded_glasses_shape, vec3(60, 0, 0));
     cad_translate(&extruded_glasses_shape, vec3(30, -10, -20));
 
-    while (true) {
-        cad_rotate(&extruded_glasses_shape, vec3(0, 5, 0));
-        cad_render_to_terminal(0.03, extruded_glasses_shape);
-        usleep(100000);
+    if (VISUALIZE) {
+        cad_visualize(extruded_glasses_shape);
     }
+
+    // while (true) {
+    //     cad_rotate(&extruded_glasses_shape, vec3(0, 5, 0));
+    //     cad_render_to_terminal(0.03, extruded_glasses_shape);
+    //     usleep(100000);
+    // }
 
     return 0;
 }
