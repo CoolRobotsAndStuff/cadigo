@@ -122,9 +122,11 @@ int cad_visualize(CAD obj) {
             Vec3 normal = cad_calculate_face_normal(obj, i);
 
             // light = normal.x * light_dir.x + normal.y * light_dir.y + normal.z * light_dir.z;
-            float diffuse = (normal.z+1) / 4; // Lighting comming from the front + ambient light / dimming
+            float ambient_light = 1.5;
+            float brightness = 0.20;
+            float lighting = (normal.z+ambient_light) * brightness;
             glBegin(GL_POLYGON);
-                glColor3f(diffuse, diffuse, diffuse);
+                glColor3f(lighting, lighting, lighting);
 
                 for (size_t j = 0; j < face.count; ++j) {
                     Vec3 v = obj.points.items[face.items[j]];
