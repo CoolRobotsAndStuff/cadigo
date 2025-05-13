@@ -24,8 +24,10 @@
 #define NOT_IMPLEMENTED do { fprintf(stderr, "%s:%d: NOT_IMPLEMENTED\n", __FILE__, __LINE__); abort(); } while(0)
 #define UNUSED(variable) (void) variable
 
-
+#ifndef CADIGO_CUSTOM_TYPE
 typedef long double val_t;
+#define VAL_FMT "Lf"
+#endif
 typedef val_t ang_t;
 
 #define ASS_INIT_CAP 100
@@ -107,9 +109,12 @@ Vec3 vec3_sub (Vec3 v1, Vec3 v2);
 Vec3 vec3_div (Vec3 v1, Vec3 v2);
 Vec3 vec3_mult(Vec3 v1, Vec3 v2);
 Vec3 vec3_avg (Vec3 v1, Vec3 v2);
+val_t vec3_max (Vec3 v1);
+val_t vec3_min (Vec3 v1);
 
 Vec3* vec3_add_to  (Vec3* v1, Vec3 v2);
 Vec3* vec3_div_by_s(Vec3* v1, val_t scalar);
+Vec3* vec3_mult_by_s(Vec3* v1, val_t scalar);
 
 
 typedef struct {
@@ -189,6 +194,7 @@ CAD cad_square(val_t l);
 CAD* cad_translate(CAD* obj, Vec3 v);
 CAD* cad_rotate(CAD* obj, Vec3 v);
 CAD* cad_scale(CAD* obj, Vec3 v);
+CAD* cad_scale_s(CAD* obj, val_t v);
 
 // Operations - Topological Geometry
 CAD* cad_catmull_clark3D(CAD* obj);
@@ -284,10 +290,32 @@ Vec3 vec3_avg(Vec3 v1, Vec3 v2) {
     return vec3_div_s(vec3_add(v1, v2), 2);
 }
 
+val_t vec3_max(Vec3 v1) {
+    return max(max(v1.x, v1.y), v1.z);
+}
+
+val_t vec3_min(Vec3 v1) {
+    return min(min(v1.x, v1.y), v1.z);
+}
+
 Vec3* vec3_div_by_s(Vec3* v1, val_t scalar) {
     v1->x /= scalar;
     v1->y /= scalar;
     v1->z /= scalar;
+    return v1;
+}
+
+Vec3* vec3_mult_by_s(Vec3* v1, val_t scalar) {
+    v1->x *= scalar;
+    v1->y *= scalar;
+    v1->z *= scalar;
+    return v1;
+}
+
+Vec3* vec3_add_to  (Vec3* v1, Vec3 v2) {
+    v1->x += v2.x;
+    v1->y += v2.y;
+    v1->z += v2.z;
     return v1;
 }
 
@@ -413,8 +441,17 @@ do {                                                            \
     for (size_t __i = __index; __i < (da)->count-1; ++__i)      \
         (da)->items[__i] = (da)->items[__i+1];                  \
     (da)->count -= 1;                                           \
-} while(0);
+} while(0)
 
+#define da_add(da1, da2)                                                                           \
+do {                                                                                                  \
+    (da1)->count += (da2).count;                                                                      \
+    if (((da1)->count + (da2).count) >= (da1)->capacity) {                                           \
+        (da1)->capacity = (da1)->capacity == 0 ? (da2).capacity : (da1)->capacity + (da2).capacity;  \
+        (da1)->items = realloc((da1)->items, (da1)->capacity*sizeof(*(da1)->items));                   \
+    }                                                                                                 \
+    memcpy((da1)->items + (da1)->count, (da2).items, (da2).count*sizeof(*(da2).items)); \
+} while(0)
 
 CAD cad_polyhedron(Points points, Faces faces) {
     return (CAD){.points = points, .faces = faces};
@@ -499,7 +536,7 @@ CAD cad_square(val_t l) {
 
 void cad_print_points(CAD obj) {
     for (size_t i = 0; i < obj.points.count; ++i) {
-        printf("(%Lf, %Lf, %Lf), ", 
+        printf("(%"VAL_FMT",%"VAL_FMT",%"VAL_FMT"), ", 
                obj.points.items[i].x,
                obj.points.items[i].y,
                obj.points.items[i].z
@@ -579,6 +616,15 @@ CAD* cad_scale(CAD* obj, Vec3 v) {
     return obj;
 }
 
+CAD* cad_scale_s(CAD* obj, val_t v) {
+    for (size_t i=0; i < obj->points.count; ++i) {
+        obj->points.items[i].x *= v;
+        obj->points.items[i].y *= v;
+        obj->points.items[i].z *= v;
+    }
+    return obj;
+}
+
 Face cad_copy_face(Face f) {
     Face ret;
     ret.count = f.count;
@@ -601,6 +647,34 @@ CAD cad_clone(CAD obj) {
     for (size_t i = 0; i < obj.faces.count; ++i)
         ret.faces.items[i] = cad_copy_face(obj.faces.items[i]);
     return ret;
+}
+
+Face cad_copy_face_into(Face f, Face* target) {
+    target->count = f.count;
+    if (target->count >= target->capacity) {
+        target->capacity = target->capacity == 0 ? DA_INIT_CAP : target->capacity*2;
+        target->items = realloc(target->items, target->capacity*sizeof(*target->items));
+    }
+    memcpy(target->items, f.items, sizeof(target->items[0])*target->count);
+}
+
+void cad_clone_into(CAD obj, CAD* target) {
+    target->points.count = obj.points.count;
+
+    if (target->points.count >= target->points.capacity) {
+        target->points.capacity = target->points.capacity == 0 ? DA_INIT_CAP : target->points.capacity*2;
+        target->points.items = realloc(target->points.items, target->points.capacity*sizeof(*target->points.items));
+    }
+    memcpy(target->points.items, obj.points.items, sizeof(target->points.items[0])*target->points.count);
+
+
+    target->faces.count = obj.faces.count;
+    if (target->faces.count >= target->faces.capacity) {
+        target->faces.capacity = target->faces.capacity == 0 ? DA_INIT_CAP : target->faces.capacity*2;
+        target->faces.items = realloc(target->faces.items, target->faces.capacity*sizeof(*target->faces.items));
+    }
+    for (size_t i = 0; i < obj.faces.count; ++i)
+        cad_copy_face_into(obj.faces.items[i], &target->faces.items[i]);
 }
 
 typedef struct {
@@ -751,12 +825,12 @@ IndexPairs get_all_edges_containing_point(CAD obj, size_t point_index) {
 void print_points (Points ps) {
     printf("--------------------------\n");
     for (size_t i = 0; i < ps.count; ++i)
-        printf("        [%.10Lf, %.10Lf, %.10Lf],\n", ps.items[i].x, ps.items[i].y, ps.items[i].z);
+        printf("        [%.10"VAL_FMT", %.10"VAL_FMT", %.10"VAL_FMT"],\n", ps.items[i].x, ps.items[i].y, ps.items[i].z);
     printf("--------------------------\n");
 }
 
 void print_point(Vec3 p) {
-    printf("        [%.10Lf, %.10Lf, %.10Lf],\n", p.x, p.y, p.z);
+    printf("        [%.10"VAL_FMT", %.10"VAL_FMT", %.10"VAL_FMT"],\n", p.x, p.y, p.z);
 }
 
 void print_faces(Faces faces) {
@@ -1035,11 +1109,11 @@ Vec3 cad_calculate_face_normal(CAD obj, size_t face_index) {
 }
 
 void vec3_print(Vec3 v) {
-    printf("<%Lf, %Lf, %Lf>", v.x, v.y, v.z);
+    printf("<%"VAL_FMT", %"VAL_FMT", %"VAL_FMT">", v.x, v.y, v.z);
 }
 
 void vec3_println(Vec3 v) {
-    printf("<%Lf, %Lf, %Lf>\n", v.x, v.y, v.z);
+    printf("<%"VAL_FMT", %"VAL_FMT", %"VAL_FMT">\n", v.x, v.y, v.z);
 }
 
 CAD* cad_hotpoints_subdivision(CAD* obj) {
@@ -1211,8 +1285,8 @@ bool ray_from_point_intersects_edge_2D(Vec3 p, Vec3 edge_a, Vec3 edge_b) {
     // -(m * x) = -(m * a.x) + a.y
     val_t     x = ((m * a.x) - a.y) / m;
 
-    printf("m: %LF\n", m);
-    printf("x: %LF\n", x);
+    printf("m: %"VAL_FMT"\n", m);
+    printf("x: %"VAL_FMT"\n", x);
 
     if (x < 0) return false;
 
@@ -1458,9 +1532,9 @@ Vec3 cad_line_intersection(Vec3 p1, Vec3 p2, Vec3 p3, Vec3 p4) {
 }
 
 CAD* cad_substract(CAD* obj1, CAD* obj2) {
-    const int mark_inside = 1;
+    const int mark_inside  = 1;
     const int mark_outside = 2;
-    
+
     ZuZuAss obj2_to_obj1 = {0};
 
     Face* face1 = &obj1->faces.items[0];
@@ -1510,9 +1584,10 @@ CAD* cad_substract(CAD* obj1, CAD* obj2) {
                     p.color = CAD_PURPLE;
                     da_append(&obj1->points, p);
                     if (obj1_a.mark == mark_outside) {
-                        da_insert(face1, face1_i, da_last_index(obj1->points));
+                        da_insert(face1, (face1_i-1)%c1, da_last_index(obj1->points));
+                        da_insert(face1, (face1_i-1)%c1, da_last_index(obj1->points));
                     } else if (obj1_b.mark == mark_outside) {
-                        da_insert(face1, (face2_i+1)%c2, da_last_index(obj1->points));
+                        da_insert(face1, (face2_i-1)%c2, da_last_index(obj1->points));
                     } else {
                         assert(false && "UNREACHABLE");
                     }
