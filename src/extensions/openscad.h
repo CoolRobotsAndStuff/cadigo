@@ -1,6 +1,7 @@
 #ifndef OPENSCAD_H_
 #define OPENSCAD_H_
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -21,7 +22,7 @@ bool cad_to_openSCAD(CAD obj, const char* file_path, const char* object_name) {
     FILE* program_file;
     program_file = fopen(file_path, "w");
     if (program_file == NULL) {
-        perror("Could not open file.");
+        fprintf(stderr, "Could not open '%s': %s\n", file_path, strerror(errno));
         return false;
     }
     cad_fprint_openSCAD(program_file, obj, object_name);
@@ -33,7 +34,7 @@ bool cad_to_openSCAD_module(CAD obj, const char* file_path, const char* module_n
     FILE* program_file;
     program_file = fopen(file_path, "w");
     if (program_file == NULL) {
-        perror("Could not open file.");
+        fprintf(stderr, "Could not open '%s': %s\n", file_path, strerror(errno));
         return false;
     }
     cad_fprint_openSCAD_module(program_file, obj,  module_name);
