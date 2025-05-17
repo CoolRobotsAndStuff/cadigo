@@ -649,7 +649,7 @@ CAD cad_clone(CAD obj) {
     return ret;
 }
 
-Face cad_copy_face_into(Face f, Face* target) {
+void cad_copy_face_into(Face f, Face* target) {
     target->count = f.count;
     if (target->count >= target->capacity) {
         target->capacity = target->capacity == 0 ? DA_INIT_CAP : target->capacity*2;
