@@ -1,7 +1,7 @@
-#include "extensions/openscad.h"
 
 #define CADIGO_IMPLEMENTATION
 #include "cadigo.h"
+#include "extensions/openscad.h"
 
 #include <stdio.h>
 

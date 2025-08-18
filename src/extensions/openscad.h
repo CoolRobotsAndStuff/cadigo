@@ -6,7 +6,6 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "../cadigo.h"
 #include "../scratch_buffer.c"
 
 
@@ -18,6 +17,7 @@ bool cad_fprint_openSCAD(FILE* file, CAD obj, const char* object_name);
 
 #endif // OPENSCAD_H_
 
+#ifdef CADIGO_IMPLEMENTATION
 bool cad_to_openSCAD(CAD obj, const char* file_path, const char* object_name) {
     FILE* program_file;
     program_file = fopen(file_path, "w");
@@ -118,4 +118,4 @@ bool cad_fprint_openSCAD_module(FILE* file, CAD obj, const char* module_name) {
     return true;
 }
 
-
+#endif // CADIGO_IMPLEMENTATION

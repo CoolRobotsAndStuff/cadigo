@@ -1,7 +1,10 @@
-#include "extensions/visualizer.h"
 #define CADIGO_IMPLEMENTATION
 #include "cadigo.h"
+#include "extensions/visualizer.h"
 
+#include <math.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 val_t vec3_dist(Vec3 a, Vec3 b) {
     return sqrt( 
@@ -11,10 +14,12 @@ val_t vec3_dist(Vec3 a, Vec3 b) {
     );
 }
 
-#define print_zu(var) printf(#var " = %zu", (var)); 
+#define print_zu(var) printf(#var " = %zu\n", (var)); 
 
 void cut(CAD* c1, CAD cutter) {
-    da_delete(&c1->faces, 0);
+    Face orig_face = cad_copy_face(c1->faces.items[0]);
+    puts("orig_face:");
+    print_face(orig_face);
 
     size_t sep = c1->points.count;
 
@@ -22,95 +27,98 @@ void cut(CAD* c1, CAD cutter) {
         da_append(&c1->points, cutter.points.items[i]);
     }
 
-    size_t j = 0;
-    while (j < sep) {
+    Face cutter_face = cutter.faces.items[0];
+    puts("cutter_face:");
+    print_face(cutter_face);
+
+    size_t prev_closest_cfi;
+    size_t fi = 0;
+    for (;;) {
+        print_faces(c1->faces);
+        print_zu(fi);
+
         Face new_face = face();
         size_t prev_closest = SIZE_MAX;
-        for (; j <= sep; ++j) {
-            size_t i;
-            if (j == c1->points.count) i = 0;
-            else i = j;
+        prev_closest_cfi = SIZE_MAX;
+
+        for (;;) {
+            size_t i = orig_face.items[fi];
+            if (fi == orig_face.count) i = orig_face.items[0];
+            
             da_append(&new_face, i);
             val_t min_dist = 1000000000000.0;
             size_t closest = 0;
-            for (size_t k = sep; k < c1->points.count; ++k) {
+            size_t closest_cfi = 0;
+
+            for (size_t cfi = 0; cfi < cutter_face.count; ++cfi) {
+                size_t k = sep + cutter_face.items[cfi];
                 val_t d = vec3_dist(c1->points.items[i], c1->points.items[k]);
-                // printf("d = %"VAL_FMT"\n", d);
-                // printf("min_dist = %"VAL_FMT"\n", min_dist);
                 if (d < min_dist) {
                     min_dist = d;
                     closest = k;
+                    closest_cfi = cfi;
                 }
             }
-            da_insert(&new_face, 0, closest);
-            if ((prev_closest != closest) && (prev_closest != SIZE_MAX)) {
-                break;
+            printf("going from previous : %zu to next: %zu\n", prev_closest_cfi, closest_cfi);
+
+            if (prev_closest_cfi != SIZE_MAX)
+                for (size_t h = prev_closest_cfi; h != closest_cfi; h=(h+1)%cutter_face.count) {
+                    size_t k = sep + cutter_face.items[h];
+
+                    if (!new_face.count || new_face.items[0] != k) {
+                        da_insert(&new_face, 0, k);
+                    }
+                }
+
+            if (!new_face.count || new_face.items[0] != closest) {
+                da_insert(&new_face, 0, closest);
             }
-            prev_closest = closest;
+            if ((prev_closest != closest) && (prev_closest != SIZE_MAX)) break;
+            prev_closest     = closest;
+            prev_closest_cfi = closest_cfi;
+            if (++fi > orig_face.count) {
+                if (new_face.count >= 3) {
+                    da_append(&c1->faces, new_face);
+                }
+                goto out;
+            }
         }
         da_append(&c1->faces, new_face);
     }
-    
-    bool last_in_face = false;
-    bool first_in_face = false;
-    for (size_t i = 0; i < c1->faces.count; ++i) {
-        last_in_face = false;
-        first_in_face = false;
-        Face face = c1->faces.items[i];
-        for (size_t j = 0; j < face.count; ++j) {
-            if (face.items[j] == 0) first_in_face = true;
-            if (face.items[j] == sep-1) last_in_face = true;
-        }
-        if (last_in_face && first_in_face) break;
-    }
+    out:
 
-    if (!(last_in_face && first_in_face)) {
-        Face new_face = face();
-        da_append(&new_face, sep-1); 
-        da_append(&new_face, 0); 
-        val_t min_dist = 1000000000000.0;
-        size_t closest = 0;
-        for (size_t k = sep; k < c1->points.count; ++k) {
-            val_t d = vec3_dist(c1->points.items[0], c1->points.items[sep]);
-            if (d < min_dist) {
-                min_dist = d;
-                closest = k;
-            }
-        }
-        da_append(&new_face, closest);
-        da_append(&c1->faces, new_face);
+    da_delete(&c1->faces, 0);
 
-    }
-
+    print_faces(c1->faces);
     print_zu(c1->faces.count);
-
+    free_face(orig_face);
 }
 
+
 int main() {
-    CAD c1 = cad_square(10);
+    CAD c1 = cad_square(20);
     CAD c2 = cad_square(5);
-    // c2.faces.items[0].count -= 1;
-    // c2.points.count -= 1;
-    //cad_translate(&c2, vec3(7, 0, 0));
-    cad_hotpoints_subdivision(&c2);
-    cad_hotpoints_subdivision(&c2);
-    print_faces(c2.faces);
-    print_points(c2.points);
-    cad_rotate_z(&c2, 30);
+    CAD c3 = {0};
 
-    cut(&c1, c2);
-    float zoom = 0.05;
-    ASCII_Screen screen = alloc_ascii_screen();
-    cad_clear_ascii_screen(&screen);
-    cad_render_to_ascii_screen(&screen, zoom, c1);
-    //cad_render_to_ascii_screen(&screen, zoom, c2);
-    cad_print_ascii_screen(screen);
+    CAD_Viz* viz = cad_viz_init();
+    viz->fps = 60;
 
-    free_ascii_screen(screen);
+    val_t pos = 0;
+    val_t v = 0.1;
 
-    cad_rotate_z(&c1, 180);
-    cad_visualize(c1);
+    while (cad_viz_keep_rendenring(viz)) {
+        cad_clone_into(c1, &c3);
+        cad_translate_x(&c2, v);
+        pos += v;
+        if (pos > 10 || pos < -10) v = -v;
+        cut(&c3, c2);
+        print_zu(c3.faces.count);
+        cad_rotate_z(&c3, 180);
 
+        cad_viz_begin(viz);
+            cad_viz_render(viz, c3);
+        cad_viz_end(viz);
+    }
 
     return 0;
 }

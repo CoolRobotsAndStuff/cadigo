@@ -1,7 +1,6 @@
-#include "extensions/visualizer.h"
-
 #define CADIGO_IMPLEMENTATION
 #include "cadigo.h"
+#include "extensions/visualizer.h"
 
 int main() {
     CAD c = cad_cube(10);

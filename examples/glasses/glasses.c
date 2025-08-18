@@ -1,8 +1,8 @@
-#include "extensions/openscad.h"
-#include "extensions/visualizer.h"
 
 #define CADIGO_IMPLEMENTATION
 #include "cadigo.h"
+#include "extensions/visualizer.h"
+#include "extensions/openscad.h"
 
 #include <stdio.h>
 

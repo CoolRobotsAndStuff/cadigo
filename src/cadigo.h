@@ -1,17 +1,27 @@
 #ifndef CADIGO_H_
 #define CADIGO_H_
 
-#include <assert.h>
-#include <string.h>
-#include <stdlib.h>
-#include <math.h>
-#include <stdbool.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-#include <stdio.h>
+#   if defined(__STDC_VERSION__) && __STDC_VERSION__ < 199901L
+#      define CAD_THIS_IS_C89
+#   endif
 
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#define max(a, b) ((a) > (b) ? (a) : (b))
+#   include <assert.h>
+#   include <string.h>
+#   include <stdlib.h>
+#   if defined(ARDUINO) || defined(CAD_THIS_IS_C89) 
+#      include <math.h>
+#   else
+#      include <tgmath.h>
+#   endif
+#   include <stdbool.h>
+#   ifndef CAD_NO_IOCTL
+#      include <sys/ioctl.h>
+#   endif
+#   include <unistd.h>
+#   include <stdio.h>
+
+#   define min(a, b) ((a) < (b) ? (a) : (b))
+#   define max(a, b) ((a) > (b) ? (a) : (b))
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458700660631558817488152092096282925409171536436789259036001133053054882046652138414695194151160943305727036575959195309218611738193261179310511854807446237996274956735188575272489122793818301194912983367336244065664308602139494639522473719070217986094370277053921717629317675238467481846766940513200056812714526356082778577134275778960917363717872146844090122495343014654958537105079227968925892354201995611212902196086403441815981362977477130996051870721134999999837297804995105973173281609631859502445945534690830264252230825334468503526193118817101000313783875288658753320838142061717766914730359825349042875546873115956286388235378759375195778185778053217122680661300192787661119590921642019893809525720106548586327886593615338182796823030195203530185296899577362259941389124972177528347913151557485724245415069595082953311686172785588907509838175463746493931925506040092770167113900984882401285836160356370766010471018194295559619894676783744944825537977472684710404753464620804668425906949129331367702898915210475216205696602405803815019351125338243003558764024749647326391419927260426992279678235478163600934172164121992458631503028618297455570674983850549458858692699569092721079750930295532116534498720275596023648066549911988183479775356636980742654252786255181841757467289097777279380008164706001614524919217321721477235014144197356854816136115735255213347574184946843852332390739414333454776241686251898356948556209921922218427255025425688767179049460165346680498862723279178608578438382796797668145410095388378636095068006422512520511739298489608412848862694560424196528502221066118630674427862203919494504712371378696095636437191728746776465757396241389086583264599581339047802759009
@@ -77,7 +87,8 @@ typedef enum {
 
 static_assert(CAD_COLOR_COUNT == 8 && "Color count changed, add color ansii");
 
-char* color_ansii[8] = {
+#define color_ansii_count 8
+char* color_ansii[color_ansii_count] = {
     [CAD_WHITE ] = "\e[0;37m",
     [CAD_BLACK ] = "\e[0;30m",
     [CAD_RED   ] = "\e[0;31m",
@@ -92,12 +103,15 @@ typedef struct {
     union { val_t x; ang_t roll;  val_t first; };
     union { val_t y; ang_t pitch; val_t second;};
     union { val_t z; ang_t yaw;   val_t third;};
-    int mark; // some algorithms are easier if you can just mark certain points;
+    char mark; // some algorithms are easier if you can just mark certain points
     CAD_Color color;
 } Vec3;
 
 Vec3 vec3(val_t x, val_t y, val_t z);
 Vec3 vec3_color(val_t x, val_t y, val_t z, CAD_Color c);
+
+Vec3 vec3_into(Vec3* target, val_t x, val_t y, val_t z);
+Vec3 vec3_clone();
 
 Vec3 vec3_add_s (Vec3 v1, val_t scalar);
 Vec3 vec3_sub_s (Vec3 v1, val_t scalar);
@@ -108,13 +122,55 @@ Vec3 vec3_add (Vec3 v1, Vec3 v2);
 Vec3 vec3_sub (Vec3 v1, Vec3 v2);
 Vec3 vec3_div (Vec3 v1, Vec3 v2);
 Vec3 vec3_mult(Vec3 v1, Vec3 v2);
+
+Vec3 vec3_add_xyz (Vec3 v1, val_t x, val_t y, val_t z);
+Vec3 vec3_sub_xyz (Vec3 v1, val_t x, val_t y, val_t z);
+Vec3 vec3_div_xyz (Vec3 v1, val_t x, val_t y, val_t z);
+Vec3 vec3_mult_xyz(Vec3 v1, val_t x, val_t y, val_t z);
+
+Vec3 vec3_add_x (Vec3 v1, val_t x);
+Vec3 vec3_sub_x (Vec3 v1, val_t x);
+Vec3 vec3_div_x (Vec3 v1, val_t x);
+Vec3 vec3_mult_x(Vec3 v1, val_t x);
+
+Vec3 vec3_add_y (Vec3 v1, val_t y);
+Vec3 vec3_sub_y (Vec3 v1, val_t y);
+Vec3 vec3_div_y (Vec3 v1, val_t y);
+Vec3 vec3_mult_y(Vec3 v1, val_t y);
+
+Vec3 vec3_add_z (Vec3 v1, val_t z);
+Vec3 vec3_sub_z (Vec3 v1, val_t z);
+Vec3 vec3_div_z (Vec3 v1, val_t z);
+Vec3 vec3_mult_z(Vec3 v1, val_t z);
+
 Vec3 vec3_avg (Vec3 v1, Vec3 v2);
 val_t vec3_max (Vec3 v1);
 val_t vec3_min (Vec3 v1);
 
 Vec3* vec3_add_to  (Vec3* v1, Vec3 v2);
-Vec3* vec3_div_by_s(Vec3* v1, val_t scalar);
-Vec3* vec3_mult_by_s(Vec3* v1, val_t scalar);
+Vec3* vec3_sub_from(Vec3* v1, Vec3 v2);
+Vec3* vec3_div_by  (Vec3* v1, Vec3 v2);
+Vec3* vec3_mult_by (Vec3* v1, Vec3 v2);
+
+Vec3* vec3_add_to_s   (Vec3* v1, val_t scalar);
+Vec3* vec3_sub_from_s (Vec3* v1, val_t scalar);
+Vec3* vec3_div_by_s   (Vec3* v1, val_t scalar);
+Vec3* vec3_mult_by_s  (Vec3* v1, val_t scalar);
+
+Vec3 vec3_add_to_xyz   (Vec3* v1, val_t x, val_t y, val_t z);
+Vec3 vec3_sub_from_xyz (Vec3* v1, val_t x, val_t y, val_t z);
+Vec3 vec3_div_by_xyz   (Vec3* v1, val_t x, val_t y, val_t z);
+Vec3 vec3_mult_by_xyz  (Vec3* v1, val_t x, val_t y, val_t z);
+
+Vec3* vec3_add_into (Vec3* target, Vec3 v1, Vec3 v2);
+Vec3* vec3_sub_into (Vec3* target, Vec3 v1, Vec3 v2);
+Vec3* vec3_div_into (Vec3* target, Vec3 v1, Vec3 v2);
+Vec3* vec3_mult_into(Vec3* target, Vec3 v1, Vec3 v2);
+
+Vec3* vec3_add_into_s (Vec3* target, Vec3 v1, val_t scalar);
+Vec3* vec3_sub_into_s (Vec3* target, Vec3 v1, val_t scalar);
+Vec3* vec3_div_into_s (Vec3* target, Vec3 v1, val_t scalar);
+Vec3* vec3_mult_into_s(Vec3* target, Vec3 v1, val_t scalar);
 
 
 typedef struct {
@@ -162,15 +218,22 @@ Face __face(size_t count, size_t* indexes);
 Faces __faces(size_t count, Face* faces);
 Points __points(size_t count, Vec3* points);
 
-#define face(...)   __face  (sizeof((size_t[]){__VA_ARGS__}) / sizeof(size_t), (size_t[]){__VA_ARGS__})
-#define faces(...)  __faces (sizeof((Face[])  {__VA_ARGS__}) / sizeof(Face)  , (Face[])  {__VA_ARGS__})
-#define points(...) __points(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3)  , (Vec3[])  {__VA_ARGS__})
-
+#ifndef ARDUINO
+    #define face(...)   __face  (sizeof((size_t[]){__VA_ARGS__}) / sizeof(size_t), (size_t[]){__VA_ARGS__})
+    #define faces(...)  __faces (sizeof((Face[])  {__VA_ARGS__}) / sizeof(Face)  , (Face[])  {__VA_ARGS__})
+    #define points(...) __points(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3)  , (Vec3[])  {__VA_ARGS__})
+#else
+    #define face(...)   __face_va  (sizeof((size_t[]){__VA_ARGS__}) / sizeof(size_t), __VA_ARGS__)
+    #define faces(...)  __faces_va (sizeof((Face[])  {__VA_ARGS__}) / sizeof(Face)  , __VA_ARGS__)
+    #define points(...) __points_va(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3)  , __VA_ARGS__)
+    Face __face_va(size_t count, ...);
+    Faces __faces_va(size_t count, ...);
+    Points __points_va(size_t count, ...);
+#endif
 
 void free_face(Face f);
 void free_faces(Faces fs);
 void free_points(Points p);
-
 
 typedef struct {
     Points points;
@@ -185,15 +248,29 @@ CAD cad_polygon(Points points);
 CAD cad_line(Points points);
 
 CAD __cad_polygon_from_points(size_t count, Vec3* points);
-#define cad_polygon_from_points(...) __cad_polygon_from_points(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3)  , (Vec3[])  {__VA_ARGS__})
+
+#ifndef ARDUINO
+    #define cad_polygon_from_points(...) __cad_polygon_from_points(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3)  , (Vec3[])  {__VA_ARGS__})
+#else
+    /* workaround for lack of (type[]){...} syntax in shitty arduino language */
+    CAD __cad_polygon_from_points_va(size_t count, ...);
+    #define cad_polygon_from_points(...) __cad_polygon_from_points_va(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3), __VA_ARGS__)
+#endif
 
 CAD cad_cube(val_t l);
 CAD cad_square(val_t l);
 
 // Operations - Similar Geometry
 CAD* cad_translate(CAD* obj, Vec3 v);
+CAD* cad_translate_x(CAD* obj, val_t v);
+CAD* cad_translate_y(CAD* obj, val_t v);
+CAD* cad_translate_z(CAD* obj, val_t v);
 CAD* cad_rotate(CAD* obj, Vec3 v);
+CAD* cad_rotate_y(CAD* obj, val_t v);
 CAD* cad_scale(CAD* obj, Vec3 v);
+CAD* cad_scale_x(CAD* obj, val_t v);
+CAD* cad_scale_y(CAD* obj, val_t v);
+CAD* cad_scale_z(CAD* obj, val_t v);
 CAD* cad_scale_s(CAD* obj, val_t v);
 
 // Operations - Topological Geometry
@@ -208,6 +285,11 @@ CAD cad_intersection(CAD obj);
 CAD cad_difference(CAD obj);
 CAD cad_union(CAD obj);
 
+typedef struct {
+    size_t count;
+    size_t capacity;
+    CAD* items;
+} CADs;
 
 typedef struct {
     Vec3 min;
@@ -305,6 +387,13 @@ Vec3* vec3_div_by_s(Vec3* v1, val_t scalar) {
     return v1;
 }
 
+Vec3* vec3_mult_by(Vec3* v1, Vec3 v2) {
+    v1->x *= v2.x;
+    v1->y *= v2.y;
+    v1->z *= v2.z;
+    return v1;
+}
+
 Vec3* vec3_mult_by_s(Vec3* v1, val_t scalar) {
     v1->x *= scalar;
     v1->y *= scalar;
@@ -355,6 +444,7 @@ Face __face(size_t count, size_t* indexes) {
 }
 
 Faces __faces(size_t count, Face* faces) {
+    printf("creating faces with count=%zu", count);
     Faces ret = {
         .count = count, 
         .capacity = count,
@@ -380,6 +470,25 @@ CAD __cad_polygon_from_points(size_t count, Vec3* points) {
     return cad_polygon(__points(count, points));
 }
 
+#ifdef ARDUINO
+/* workaround for lack of (type[]){...} syntax in shitty arduino language */
+#define ARDUINO_VA_WRAPPER_IMPL(ret_type, func, arg_type)     \
+ret_type func##_va(size_t count, ...) {             \
+    arg_type arr[count];                            \
+    va_list args;                                   \
+    va_start(args, count);                          \
+        for (int i = 0; i < count; i++)             \
+            arr[i] = va_arg(args, arg_type);        \
+    va_end(args);                                   \
+    return func(count, arr);                        \
+}
+
+ARDUINO_VA_WRAPPER_IMPL(Faces, __faces, Face)
+ARDUINO_VA_WRAPPER_IMPL(Face, __face, size_t)
+ARDUINO_VA_WRAPPER_IMPL(Points, __points, Vec3)
+ARDUINO_VA_WRAPPER_IMPL(CAD, __cad_polygon_from_points, Vec3)
+#endif
+
 void free_face(Face f) {
     free(f.items);
     f.count = 0;
@@ -389,6 +498,7 @@ void free_face(Face f) {
 void free_faces(Faces fs) {
     for (size_t i = 0; i < fs.count; ++i)
         free_face(fs.items[i]);
+    free(fs.items);
     fs.count = 0;
     fs.capacity = 0;
 }
@@ -501,7 +611,7 @@ CAD cad_cube(val_t l) {
             vec3( a, -a, -a),
             vec3( a, -a,  a),
             vec3( a,  a,  a),
-            vec3( a,  a, -a),
+            vec3( a,  a, -a)
         ),
         .faces = faces(
             // Each pair are opposites
@@ -552,6 +662,25 @@ CAD* cad_translate(CAD* obj, Vec3 v) {
     }
     return obj;
 }
+
+CAD* cad_translate_x(CAD* obj, val_t v) {
+    for (size_t i = 0; i < obj->points.count; ++i)
+        obj->points.items[i].x += v;
+    return obj;
+}
+
+CAD* cad_translate_y(CAD* obj, val_t v) {
+    for (size_t i = 0; i < obj->points.count; ++i)
+        obj->points.items[i].y += v;
+    return obj;
+}
+
+CAD* cad_translate_z(CAD* obj, val_t v) {
+    for (size_t i = 0; i < obj->points.count; ++i)
+        obj->points.items[i].z += v;
+    return obj;
+}
+
 
 Polar2D xy_to_polar(val_t x, val_t y) {
     Polar2D ret;
@@ -607,12 +736,51 @@ CAD* cad_rotate(CAD* obj, Vec3 v) {
     return obj;
 }
 
+CAD* cad_rotate_x(CAD* obj, val_t v) {
+    for (size_t i = 0; i < obj->points.count; ++i) {
+        obj->points.items[i] = vec3_rotate_roll(degs2rads(v),  obj->points.items[i]);
+    }
+    return obj;
+}
+
+CAD* cad_rotate_y(CAD* obj, val_t v) {
+    for (size_t i = 0; i < obj->points.count; ++i) {
+        obj->points.items[i] = vec3_rotate_pitch(degs2rads(v),  obj->points.items[i]);
+    }
+    return obj;
+}
+
+CAD* cad_rotate_z(CAD* obj, val_t v) {
+    for (size_t i = 0; i < obj->points.count; ++i) {
+        obj->points.items[i] = vec3_rotate_yaw(degs2rads(v),  obj->points.items[i]);
+    }
+    return obj;
+}
+
 CAD* cad_scale(CAD* obj, Vec3 v) {
     for (size_t i=0; i < obj->points.count; ++i) {
         obj->points.items[i].x *= v.x;
         obj->points.items[i].y *= v.y;
         obj->points.items[i].z *= v.z;
     }
+    return obj;
+}
+
+CAD* cad_scale_x(CAD* obj, val_t v) {
+    for (size_t i=0; i < obj->points.count; ++i)
+        obj->points.items[i].x *= v;
+    return obj;
+}
+
+CAD* cad_scale_y(CAD* obj, val_t v) {
+    for (size_t i=0; i < obj->points.count; ++i)
+        obj->points.items[i].y *= v;
+    return obj;
+}
+
+CAD* cad_scale_z(CAD* obj, val_t v) {
+    for (size_t i=0; i < obj->points.count; ++i)
+        obj->points.items[i].z *= v;
     return obj;
 }
 
@@ -652,7 +820,8 @@ CAD cad_clone(CAD obj) {
 void cad_copy_face_into(Face f, Face* target) {
     target->count = f.count;
     if (target->count >= target->capacity) {
-        target->capacity = target->capacity == 0 ? DA_INIT_CAP : target->capacity*2;
+        target->capacity = target->count;
+        printf("realloc size faces = %zu\n",   target->capacity*sizeof(*target->items));
         target->items = realloc(target->items, target->capacity*sizeof(*target->items));
     }
     memcpy(target->items, f.items, sizeof(target->items[0])*target->count);
@@ -662,7 +831,8 @@ void cad_clone_into(CAD obj, CAD* target) {
     target->points.count = obj.points.count;
 
     if (target->points.count >= target->points.capacity) {
-        target->points.capacity = target->points.capacity == 0 ? DA_INIT_CAP : target->points.capacity*2;
+        target->points.capacity = target->points.count;
+        printf("realloc size points = %zu\n", target->points.capacity*sizeof(*target->points.items));
         target->points.items = realloc(target->points.items, target->points.capacity*sizeof(*target->points.items));
     }
     memcpy(target->points.items, obj.points.items, sizeof(target->points.items[0])*target->points.count);
@@ -670,7 +840,8 @@ void cad_clone_into(CAD obj, CAD* target) {
 
     target->faces.count = obj.faces.count;
     if (target->faces.count >= target->faces.capacity) {
-        target->faces.capacity = target->faces.capacity == 0 ? DA_INIT_CAP : target->faces.capacity*2;
+        target->faces.capacity = target->faces.count;
+        printf("realloc size faces = %zu\n", target->faces.capacity*sizeof(*target->faces.items));
         target->faces.items = realloc(target->faces.items, target->faces.capacity*sizeof(*target->faces.items));
     }
     for (size_t i = 0; i < obj.faces.count; ++i)
@@ -856,9 +1027,9 @@ void print_face(Face f) {
 
 CAD* cad_catmull_clark(CAD* obj) {
     assert(obj->faces.count > 1 && "ERROR: cad_catmull_clark is for polyhedron subdivision. Use another function for polygons.");
-    const int original_point = 1;
-    const int edge_point = 2;
-    const int face_point = 3;
+    const char original_point = 1;
+    const char edge_point = 2;
+    const char face_point = 3;
     UNUSED(face_point);
 
     for (size_t i = 0; i < obj->points.count; ++i)
@@ -1087,20 +1258,21 @@ Vec3 cad_calculate_face_normal(CAD obj, size_t face_index) {
     assert(face_index < obj.faces.count);
     Face f = obj.faces.items[face_index];
     assert(f.count >= 3 && "invalid face");
+    
+    Vec3 normal = vec3(0, 0, 0);
+    for (size_t i = 0; i < f.count; ++i) { 
+        Vec3 v1 = obj.points.items[f.items[(0+i)%f.count]];
+        Vec3 v2 = obj.points.items[f.items[(1+i)%f.count]];
+        Vec3 v3 = obj.points.items[f.items[(2+i)%f.count]];
 
-    Vec3 v1 = obj.points.items[f.items[0]];
-    Vec3 v2 = obj.points.items[f.items[1]];
-    Vec3 v3 = obj.points.items[f.items[2]];
+        Vec3 edge1 = vec3(v2.x - v1.x, v2.y - v1.y, v2.z - v1.z);
+        Vec3 edge2 = vec3(v3.x - v1.x, v3.y - v1.y, v3.z - v1.z);
 
-    Vec3 edge1 = vec3(v2.x - v1.x, v2.y - v1.y, v2.z - v1.z);
-    Vec3 edge2 = vec3(v3.x - v1.x, v3.y - v1.y, v3.z - v1.z);
-
-    // Cross product
-    Vec3 normal = vec3(
-        edge1.y * edge2.z - edge1.z * edge2.y,
-        edge1.z * edge2.x - edge1.x * edge2.z,
-        edge1.x * edge2.y - edge1.y * edge2.x
-    );
+        // Cross product
+        normal.x += edge1.y * edge2.z - edge1.z * edge2.y;
+        normal.y += edge1.z * edge2.x - edge1.x * edge2.z;
+        normal.z += edge1.x * edge2.y - edge1.y * edge2.x;
+    }
 
     // Normalize
     val_t length = sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
@@ -1316,15 +1488,23 @@ int mini(int x, int y) {
 }
 
 ASCII_Screen alloc_ascii_screen() {
+    #ifndef CAD_NO_IOCTL
     struct winsize w; 
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1) {
         perror("ioctl");
         return (ASCII_Screen){0};
     }
+    #endif
 
     ASCII_Screen ret;
+
+    #ifndef CAD_NO_IOCTL
     ret.width  = w.ws_col;
     ret.height = w.ws_row-1;
+    #else 
+    ret.width  = 80;
+    ret.height = 60;
+    #endif
     ret.mat     = calloc(ret.width*ret.height, sizeof(char));
     ret.zbuffer = calloc(ret.width*ret.height, sizeof(val_t));
     ret.colors  = calloc(ret.width*ret.height, sizeof(CAD_Color));
@@ -1354,15 +1534,16 @@ ang_t angle_between(int a_x, int a_y, int b_x, int b_y) {
     return atan2(b_y - a_y, b_x - a_x);
 }
 
+
 char angle_to_line_char(ang_t angle_radians) {
     ang_t margin = M_PI / 10.0;
 
-    if (fabsl( 0.0  - angle_radians) < margin) return '-';
-    if (fabsl( M_PI - angle_radians) < margin) return '-';
-    if (fabsl(-M_PI - angle_radians) < margin) return '-';
+    if (fabs( 0.0  - angle_radians) < margin) return '-';
+    if (fabs( M_PI - angle_radians) < margin) return '-';
+    if (fabs(-M_PI - angle_radians) < margin) return '-';
 
-    if (fabsl( M_PI/2 - angle_radians) < margin) return '|';
-    if (fabsl(-M_PI/2 - angle_radians) < margin) return '|';
+    if (fabs( M_PI/2 - angle_radians) < margin) return '|';
+    if (fabs(-M_PI/2 - angle_radians) < margin) return '|';
 
     if (angle_radians >  M_PI / 2 && angle_radians <  M_PI) return '/';
     if (angle_radians > -M_PI / 2 &&  angle_radians < 0) return '/';
@@ -1397,6 +1578,93 @@ void line(ASCII_Screen screen,
         ));
         screen.zbuffer[a_x + (a_y)*screen.width] = -10000.0;
     }
+}
+
+void cad_char_line(char* screen, size_t width, size_t height, 
+          int a_x, int a_y, 
+          int b_x, int b_y) {
+
+    int dx = abs(b_x - a_x), sx = a_x < b_x ? 1 : -1;
+    int dy = abs(b_y - a_y), sy = a_y < b_y ? 1 : -1;
+    int err = (dx > dy ? dx : -dy) / 2;
+
+    while (a_x != b_x || a_y != b_y) {
+        int e2 = err;
+        if (e2 > -dx) { err -= dy; a_x += sx; }
+        if (e2 <  dy) { err += dx; a_y += sy; }
+
+        if (a_x >= (int)width) continue; 
+        if (a_y >= (int)height) continue; 
+        if (a_x < 0) continue; 
+        if (a_y < 0) continue; 
+        screen[a_x + (a_y)*width] = angle_to_line_char(angle_between(
+            a_x, a_y, b_x, b_y
+        ));
+        //zbuffer[a_x + (a_y)*width] = -10000.0;
+    }
+}
+
+void cad_simple_show(val_t zoom, CAD obj, void (*write_char)(char), void (*debug)(const char*)) {
+    #define CAD_SIMPLE_SHOW_WIDTH 25
+    #define CAD_SIMPLE_SHOW_HEIGHT 10
+    char screen[CAD_SIMPLE_SHOW_WIDTH*CAD_SIMPLE_SHOW_HEIGHT] = {0};
+
+    CAD tmp = cad_clone(obj);
+    CAD* temp = &tmp;
+    cad_scale_x(temp, 2);
+
+    val_t s = zoom * mini(CAD_SIMPLE_SHOW_HEIGHT, CAD_SIMPLE_SHOW_WIDTH);
+    cad_scale_s(temp, s);
+    cad_translate(temp, vec3(CAD_SIMPLE_SHOW_WIDTH/2, CAD_SIMPLE_SHOW_HEIGHT/2, 1));
+
+
+    for (size_t y = 0; y < CAD_SIMPLE_SHOW_HEIGHT; ++y) {
+        for (size_t x = 0; x < CAD_SIMPLE_SHOW_WIDTH; ++x) {
+            screen[x+(y*CAD_SIMPLE_SHOW_WIDTH)] = ' ';
+        }
+    }
+
+    IndexPairs edges = get_all_edges(tmp);
+    for (size_t i = 0; i < edges.count; ++i) {
+        cad_char_line(screen, CAD_SIMPLE_SHOW_WIDTH, CAD_SIMPLE_SHOW_HEIGHT,
+             temp->points.items[edges.items[i].first].x,
+             temp->points.items[edges.items[i].first].y,
+             temp->points.items[edges.items[i].second].x,
+             temp->points.items[edges.items[i].second].y);
+    }
+    free(edges.items);
+
+    for (size_t i = 0; i < temp->points.count; ++i) {
+        Vec3 p = temp->points.items[i];
+
+        if (p.y < 0) continue; 
+        if (p.x < 0) continue; 
+        if (p.y >= CAD_SIMPLE_SHOW_HEIGHT) continue;
+        if (p.x >= CAD_SIMPLE_SHOW_WIDTH) continue;
+
+        int x = p.x;
+        int y = p.y;
+
+        // char tmp_buf[10] = {0};
+        // sprintf(tmp_buf, "x,y %d,%d\n", x, y);
+        // debug(tmp_buf);
+        screen [x+(y*CAD_SIMPLE_SHOW_WIDTH)] = '.'; //chars[c];
+    }
+
+    debug("hi\n");
+
+    for (size_t y = 0; y < CAD_SIMPLE_SHOW_HEIGHT; ++y) {
+        for (size_t x = 0; x < CAD_SIMPLE_SHOW_WIDTH; ++x) {
+            write_char(screen[x+(y*CAD_SIMPLE_SHOW_WIDTH)]);
+        }
+        write_char('\n');
+    }
+    cad_free(tmp);
+    return;
+
+
+
+
 }
 
 
@@ -1452,7 +1720,7 @@ void cad_print_ascii_screen(ASCII_Screen screen) {
     printf("\033[H\033[2J");
     for (size_t y = 0; y < screen.height; ++y) {
         for (size_t x = 0; x < screen.width; ++x) {
-            printf("%s%c\e[0m", color_ansii[screen.colors[x+(y*screen.width)]], screen.mat[x+(y*screen.width)]);
+            printf("%s%c\e[0m", color_ansii[screen.colors[x+(y*screen.width)]%color_ansii_count], screen.mat[x+(y*screen.width)]);
         }
         printf("\n");
     }
@@ -1510,30 +1778,32 @@ bool cad_segments_intersect(Vec3 a1, Vec3 b1, Vec3 a2, Vec3 b2) {
 }
 
 Vec3 cad_line_intersection(Vec3 p1, Vec3 p2, Vec3 p3, Vec3 p4) {
-    val_t A1 = p2.y - p1.y;
-    val_t B1 = p1.x - p2.x;
-    val_t C1 = A1 * p1.x + B1 * p1.y;
+    val_t a1 = p2.y - p1.y;
+    val_t b1 = p1.x - p2.x;
+    val_t c1 = a1 * p1.x + b1 * p1.y;
 
-    val_t A2 = p4.y - p3.y;
-    val_t B2 = p3.x - p4.x;
-    val_t C2 = A2 * p3.x + B2 * p3.y;
+    val_t a2 = p4.y - p3.y;
+    val_t b2 = p3.x - p4.x;
+    val_t c2 = a2 * p3.x + b2 * p3.y;
 
-    val_t determinant = A1 * B2 - A2 * B1;
+    val_t determinant = a1 * b2 - a2 * b1;
 
     // if the lines are parallel
+    Vec3 ret = {0};
     if (determinant == 0) {
-        return (Vec3){ .x=INFINITY, .y=INFINITY };
+        ret.x=INFINITY;
+        ret.y=INFINITY;
+        return ret;
     } else {
-        return (Vec3){
-            .x = (B2 * C1 - B1 * C2) / determinant,
-            .y = (A1 * C2 - A2 * C1) / determinant
-        };
+        ret.x = (b2 * c1 - b1 * c2) / determinant;
+        ret.y = (a1 * c2 - a2 * c1) / determinant;
+        return ret;
     }
 }
 
 CAD* cad_substract(CAD* obj1, CAD* obj2) {
-    const int mark_inside  = 1;
-    const int mark_outside = 2;
+    const char mark_inside  = 1;
+    const char mark_outside = 2;
 
     ZuZuAss obj2_to_obj1 = {0};
 

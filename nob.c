@@ -12,11 +12,12 @@ bool build(const char* src, const char* dst, bool rgfw) {
                    "-std=c11",
                    "-Wall", "-Wextra",
                    "-Isrc",
+                   "-ggdb",
                    "-o", dst,
                    src,
                    "-lm"
     );
-    if (rgfw) nob_cmd_append(&cmd, "-lX11", "-lGL", "-lXrandr");
+    if (rgfw) nob_cmd_append(&cmd, "-lX11", "-lGL", "-lXrandr",  "-Wno-unused-label", "-Wno-pointer-sign");
 
     return nob_cmd_run_sync_and_reset(&cmd);
 
@@ -64,6 +65,21 @@ int main(int argc, char **argv) {
         else if (streq(cmd_or_target, "visualizer")) {
             src = "examples/visualizer.c";
             dst = "./build/visualizer";
+            rgfw = true;
+        }
+        else if (streq(cmd_or_target, "vecops")) {
+            src = "examples/vecops.c";
+            dst = "./build/vecops";
+            rgfw = true;
+        }
+        else if (streq(cmd_or_target, "cutface")) {
+            src = "examples/cutface.c";
+            dst = "./build/cutface";
+            rgfw = true;
+        }
+        else if (streq(cmd_or_target, "cutface_border")) {
+            src = "examples/cutface_border.c";
+            dst = "./build/cutface_border";
             rgfw = true;
         }
         else  {
