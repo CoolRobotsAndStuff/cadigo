@@ -20,7 +20,7 @@ val_t cad_sin(val_t x) { return (val_t)sin((val_t)x); }
 #define VISUALIZE true
 
 int main() {
-    CAD glasses_shape = cad_polygon_from_points(
+    CAD* glasses_shape = cad_polygon_from_points(
 
             vec3(-0.3 , 25  , 0.5), 
             vec3(0.5  , 20  , 0.5),
@@ -65,42 +65,42 @@ int main() {
 
     );
     
-    CAD extruded_glasses_shape = cad_clone(glasses_shape);
+    CAD* extruded_glasses_shape = cad_clone(*glasses_shape);
 
-    cad_extrude(&extruded_glasses_shape, 2);
-    cad_inset_face(&extruded_glasses_shape, 1, .1);
-    cad_inset_face(&extruded_glasses_shape, 0, .1);
-    cad_catmull_clark(&extruded_glasses_shape);
-    //cad_catmull_clark(&extruded_glasses_shape);
-    cad_translate(&extruded_glasses_shape, vec3(-cad_get_bounds(extruded_glasses_shape).max.x, 0, 0));
-    cad_to_openSCAD_module(extruded_glasses_shape, "examples/glasses/extruded_glasses_shape.scad", "extruded_glasses_shape");
+    cad_extrude(extruded_glasses_shape, 2);
+    cad_inset_face(extruded_glasses_shape, 1, .1);
+    cad_inset_face(extruded_glasses_shape, 0, .1);
+    cad_catmull_clark(extruded_glasses_shape);
+    //cad_catmull_clark(extruded_glasses_shape);
+    cad_translate(extruded_glasses_shape, vec3(-cad_get_bounds(*extruded_glasses_shape).max.x, 0, 0));
+    cad_to_openSCAD_module(*extruded_glasses_shape, "examples/glasses/extruded_glasses_shape.scad", "extruded_glasses_shape");
     //cad_to_openSCAD("examples/glasses/extruded_glasses_shape.scad", extruded_glasses_shape);
 
 
-    CAD flattened_glasses_shape = cad_clone(glasses_shape);
+    CAD* flattened_glasses_shape = cad_clone(*glasses_shape);
 
-    cad_scale(&flattened_glasses_shape, vec3(1, 1, 0));
-    cad_hotpoints_subdivision(&flattened_glasses_shape);
-    cad_hotpoints_subdivision(&flattened_glasses_shape);
-    cad_translate(&flattened_glasses_shape, vec3(-cad_get_bounds(flattened_glasses_shape).max.x, 0, 0));
-    cad_to_openSCAD_module(flattened_glasses_shape, "examples/glasses/flattened_glasses_shape.scad", "flattened_glasses_shape");
+    cad_scale(flattened_glasses_shape, vec3(1, 1, 0));
+    cad_hotpoints_subdivision(flattened_glasses_shape);
+    cad_hotpoints_subdivision(flattened_glasses_shape);
+    cad_translate(flattened_glasses_shape, vec3(-cad_get_bounds(*flattened_glasses_shape).max.x, 0, 0));
+    cad_to_openSCAD_module(*flattened_glasses_shape, "examples/glasses/flattened_glasses_shape.scad", "flattened_glasses_shape");
     //cad_to_openSCAD("examples/glasses/flattened_glasses_shape.scad", flattened_glasses_shape);
     
 
     //CAD bridge_curve = cad_xy_curve_from_function(normal_distribution, -0.8, 0.8, 30);
 
-    CAD bridge_curve = cad_xy_curve_from_function(cad_sin, -M_PI*1.5, M_PI*0.5, 30);
-    Bounds b = cad_get_bounds(bridge_curve);
-    Vec3 size = cad_get_size(bridge_curve);
-    cad_translate(&bridge_curve, vec3(-b.max.x + size.x /2, -b.min.y, 0));
-    cad_curve_to_polygon(&bridge_curve);
-    cad_to_openSCAD_module(bridge_curve, "examples/glasses/bridge_curve.scad", "bridge_curve");
+    CAD* bridge_curve = cad_xy_curve_from_function(cad_sin, -M_PI*1.5, M_PI*0.5, 30);
+    Bounds b = cad_get_bounds(*bridge_curve);
+    Vec3 size = cad_get_size(*bridge_curve);
+    cad_translate(bridge_curve, vec3(-b.max.x + size.x /2, -b.min.y, 0));
+    cad_curve_to_polygon(bridge_curve);
+    cad_to_openSCAD_module(*bridge_curve, "examples/glasses/bridge_curve.scad", "bridge_curve");
 
-    cad_rotate(&extruded_glasses_shape, vec3(60, 0, 0));
-    cad_translate(&extruded_glasses_shape, vec3(30, -10, -20));
+    cad_rotate(extruded_glasses_shape, vec3(60, 0, 0));
+    cad_translate(extruded_glasses_shape, vec3(30, -10, -20));
 
     if (VISUALIZE) {
-        cad_visualize(extruded_glasses_shape);
+        cad_visualize(*extruded_glasses_shape);
     }
 
     // while (true) {

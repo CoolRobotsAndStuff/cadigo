@@ -96,9 +96,9 @@ void cut(CAD* c1, CAD cutter) {
 
 
 int main() {
-    CAD c1 = cad_square(20);
-    CAD c2 = cad_square(5);
-    CAD c3 = {0};
+    CAD* c1 = cad_square(20);
+    CAD* c2 = cad_square(5);
+    CAD* c3 = cad_alloc();
 
     CAD_Viz* viz = cad_viz_init();
     viz->fps = 60;
@@ -107,16 +107,16 @@ int main() {
     val_t v = 0.1;
 
     while (cad_viz_keep_rendenring(viz)) {
-        cad_clone_into(c1, &c3);
-        cad_translate_x(&c2, v);
+        cad_clone_into(*c1, c3);
+        cad_translate_x(c2, v);
         pos += v;
         if (pos > 10 || pos < -10) v = -v;
-        cut(&c3, c2);
-        print_zu(c3.faces.count);
-        cad_rotate_z(&c3, 180);
+        cut(c3, *c2);
+        print_zu(c3->faces.count);
+        cad_rotate_z(c3, 180);
 
         cad_viz_begin(viz);
-            cad_viz_render(viz, c3);
+            cad_viz_render(viz, *c3);
         cad_viz_end(viz);
     }
 

@@ -22,6 +22,7 @@
 
 #   define min(a, b) ((a) < (b) ? (a) : (b))
 #   define max(a, b) ((a) > (b) ? (a) : (b))
+#   define cad_repeat(n) for (size_t cad__i = 0; cad__i < n; ++cad__i)
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458700660631558817488152092096282925409171536436789259036001133053054882046652138414695194151160943305727036575959195309218611738193261179310511854807446237996274956735188575272489122793818301194912983367336244065664308602139494639522473719070217986094370277053921717629317675238467481846766940513200056812714526356082778577134275778960917363717872146844090122495343014654958537105079227968925892354201995611212902196086403441815981362977477130996051870721134999999837297804995105973173281609631859502445945534690830264252230825334468503526193118817101000313783875288658753320838142061717766914730359825349042875546873115956286388235378759375195778185778053217122680661300192787661119590921642019893809525720106548586327886593615338182796823030195203530185296899577362259941389124972177528347913151557485724245415069595082953311686172785588907509838175463746493931925506040092770167113900984882401285836160356370766010471018194295559619894676783744944825537977472684710404753464620804668425906949129331367702898915210475216205696602405803815019351125338243003558764024749647326391419927260426992279678235478163600934172164121992458631503028618297455570674983850549458858692699569092721079750930295532116534498720275596023648066549911988183479775356636980742654252786255181841757467289097777279380008164706001614524919217321721477235014144197356854816136115735255213347574184946843852332390739414333454776241686251898356948556209921922218427255025425688767179049460165346680498862723279178608578438382796797668145410095388378636095068006422512520511739298489608412848862694560424196528502221066118630674427862203919494504712371378696095636437191728746776465757396241389086583264599581339047802759009
@@ -240,14 +241,18 @@ typedef struct {
     Faces faces;
 } CAD;
 
-void cad_free(CAD obj);
-CAD cad_clone(CAD obj);
+CAD* cad_alloc();
+void cad_free(CAD* obj);
+CAD* cad_clone(CAD obj);
 
-CAD cad_polyhedron(Points points, Faces faces);
-CAD cad_polygon(Points points);
-CAD cad_line(Points points);
+void cad_on_alloc(CAD* obj);
+void cad_on_free(CAD* obj);
 
-CAD __cad_polygon_from_points(size_t count, Vec3* points);
+CAD* cad_polyhedron(Points points, Faces faces);
+CAD* cad_polygon(Points points);
+CAD* cad_line(Points points);
+
+CAD* __cad_polygon_from_points(size_t count, Vec3* points);
 
 #ifndef ARDUINO
     #define cad_polygon_from_points(...) __cad_polygon_from_points(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3)  , (Vec3[])  {__VA_ARGS__})
@@ -257,8 +262,8 @@ CAD __cad_polygon_from_points(size_t count, Vec3* points);
     #define cad_polygon_from_points(...) __cad_polygon_from_points_va(sizeof((Vec3[])  {__VA_ARGS__}) / sizeof(Vec3), __VA_ARGS__)
 #endif
 
-CAD cad_cube(val_t l);
-CAD cad_square(val_t l);
+CAD* cad_cube(val_t l);
+CAD* cad_square(val_t l);
 
 // Operations - Similar Geometry
 CAD* cad_translate(CAD* obj, Vec3 v);
@@ -281,14 +286,14 @@ CAD* cad_extrude(CAD* obj, double h);
 Vec3 cad_calculate_face_normal(CAD obj, size_t face_index);
 // Operations - Booleans
 CAD* cad_substract(CAD* obj1, CAD* obj2);
-CAD cad_intersection(CAD obj);
-CAD cad_difference(CAD obj);
-CAD cad_union(CAD obj);
+CAD* cad_intersection(CAD obj);
+CAD* cad_difference(CAD obj);
+CAD* cad_union(CAD obj);
 
 typedef struct {
     size_t count;
     size_t capacity;
-    CAD* items;
+    CAD** items;
 } CADs;
 
 typedef struct {
@@ -444,7 +449,7 @@ Face __face(size_t count, size_t* indexes) {
 }
 
 Faces __faces(size_t count, Face* faces) {
-    printf("creating faces with count=%zu", count);
+    //printf("creating faces with count=%zu", count);
     Faces ret = {
         .count = count, 
         .capacity = count,
@@ -466,7 +471,7 @@ Points __points(size_t count, Vec3* points) {
     return ret;
 }
 
-CAD __cad_polygon_from_points(size_t count, Vec3* points) {
+CAD* __cad_polygon_from_points(size_t count, Vec3* points) {
     return cad_polygon(__points(count, points));
 }
 
@@ -509,9 +514,25 @@ void free_points(Points p) {
     p.capacity = 0;
 }
 
-void cad_free(CAD obj) {
-    free_points(obj.points);
-    free_faces(obj.faces);
+#ifndef CADIGO_CREATION_HOOKS
+void cad_on_alloc(CAD* _) { (void) _; };
+void cad_on_free (CAD* _) { (void) _; };
+#endif
+
+//TODO unhooked alloc and free for internal objects
+CAD* cad_alloc(void) {
+    CAD* ret = malloc(sizeof(CAD));
+    ret->points = (Points){0};
+    ret->faces  = (Faces){0};
+    cad_on_alloc(ret);
+    return ret;
+}
+
+void cad_free(CAD* obj) {
+    cad_on_free(obj);
+    free_points(obj->points);
+    free_faces(obj->faces);
+    free(obj);
 }
 
 #define da_size(array) ((array.capacity) > 0 ? sizeof(array.items[0]) * (array.capacity) : 0)
@@ -563,11 +584,16 @@ do {                                                                            
     memcpy((da1)->items + (da1)->count, (da2).items, (da2).count*sizeof(*(da2).items)); \
 } while(0)
 
-CAD cad_polyhedron(Points points, Faces faces) {
-    return (CAD){.points = points, .faces = faces};
+CAD* cad_polyhedron(Points points, Faces faces) {
+    CAD* ret = cad_alloc();
+    ret->points = points;
+    ret->faces = faces;
+    return ret;
 }
 
-CAD cad_polygon(Points points) {
+CAD* cad_polygon(Points points) {
+    CAD* ret = cad_alloc();
+
     Face f;
     f.count = points.count;
     f.capacity = points.count;
@@ -581,66 +607,71 @@ CAD cad_polygon(Points points) {
     fs.items = (Face*)malloc(sizeof(Face));
     fs.items[0] = f;
 
-    return (CAD){.points = points, .faces = fs};
+    ret->points = points;
+    ret->faces = fs;
+
+    return ret;
 }
 
-CAD cad_line(Points points) {
-    return (CAD){.points = points, .faces = (Faces){0}};
+CAD* cad_line(Points points) {
+    CAD* ret = cad_alloc();
+    ret->points = points;
+    ret->faces = (Faces){0};
+    return ret;
 }
 
-CAD cad_segment(Vec3 a, Vec3 b) {
-    return (CAD) {
-        .points = points(a, b),
-        .faces = faces(face(0, 1))
-    };
+CAD* cad_segment(Vec3 a, Vec3 b) {
+    CAD* ret = cad_alloc();
+    ret->points = points(a, b);
+    ret->faces = faces(face(0, 1));
+    return ret;
 }
 
-CAD cad_point_object(Vec3 p) {
-    return (CAD){.points = points(p), .faces = (Faces){0}};
+CAD* cad_point_object(Vec3 p) {
+    CAD* ret = cad_alloc();
+    ret->points = points(p);
+    ret->faces = (Faces){0};
+    return ret;
 }
 
-CAD cad_cube(val_t l) {
+CAD* cad_cube(val_t l) {
     val_t a = l/2;
-    CAD c = {
-        .points = points(
-            vec3(-a, -a, -a),
-            vec3(-a, -a,  a),
-            vec3(-a,  a,  a),
-            vec3(-a,  a, -a),
+    CAD* c = cad_alloc();
+    c->points = points(
+        vec3(-a, -a, -a),
+        vec3(-a, -a,  a),
+        vec3(-a,  a,  a),
+        vec3(-a,  a, -a),
 
-            vec3( a, -a, -a),
-            vec3( a, -a,  a),
-            vec3( a,  a,  a),
-            vec3( a,  a, -a)
-        ),
-        .faces = faces(
-            // Each pair are opposites
-            face(3, 2, 1, 0),
-            face(4, 5, 6, 7),
+        vec3( a, -a, -a),
+        vec3( a, -a,  a),
+        vec3( a,  a,  a),
+        vec3( a,  a, -a)
+    );
+    c->faces = faces(
+        // Each pair are opposites
+        face(3, 2, 1, 0),
+        face(4, 5, 6, 7),
 
-            face(0, 1, 5, 4),
-            face(2, 3, 7, 6),
+        face(0, 1, 5, 4),
+        face(2, 3, 7, 6),
 
-            face(1, 2, 6, 5),
-            face(7, 3, 0, 4)
-        )
-    };
+        face(1, 2, 6, 5),
+        face(7, 3, 0, 4)
+    );
     return c;
 }
 
-CAD cad_square(val_t l) {
+CAD* cad_square(val_t l) {
     val_t a = l/2;
-    CAD s = {
-        .points = points(
-            vec3(-a, -a, 0),
-            vec3( a, -a, 0),
-            vec3( a,  a, 0),
-            vec3(-a,  a, 0)
-        ),
-        .faces = faces(
-            face(0, 1, 2, 3)
-        )
-    };
+    CAD* s = cad_alloc();
+    s->points = points(
+        vec3(-a, -a, 0),
+        vec3( a, -a, 0),
+        vec3( a,  a, 0),
+        vec3(-a,  a, 0)
+    );
+    s->faces = faces(face(0, 1, 2, 3));
     return s;
 }
 
@@ -802,18 +833,18 @@ Face cad_copy_face(Face f) {
     return ret;
 }
 
-CAD cad_clone(CAD obj) {
-    CAD ret;
-    ret.points.count    = obj.points.count;
-    ret.points.capacity = obj.points.capacity;
-    ret.points.items    = (Vec3*)malloc(da_size(obj.points));
-    memcpy(ret.points.items, obj.points.items, da_size(obj.points));
+CAD* cad_clone(CAD obj) {
+    CAD* ret = cad_alloc();
+    ret->points.count    = obj.points.count;
+    ret->points.capacity = obj.points.capacity;
+    ret->points.items    = (Vec3*)malloc(da_size(obj.points));
+    memcpy(ret->points.items, obj.points.items, da_size(obj.points));
 
-    ret.faces.count    = obj.faces.count;
-    ret.faces.capacity = obj.faces.capacity;
-    ret.faces.items    = (Face*)malloc(da_size(obj.faces));
+    ret->faces.count    = obj.faces.count;
+    ret->faces.capacity = obj.faces.capacity;
+    ret->faces.items    = (Face*)malloc(da_size(obj.faces));
     for (size_t i = 0; i < obj.faces.count; ++i)
-        ret.faces.items[i] = cad_copy_face(obj.faces.items[i]);
+        ret->faces.items[i] = cad_copy_face(obj.faces.items[i]);
     return ret;
 }
 
@@ -1035,7 +1066,7 @@ CAD* cad_catmull_clark(CAD* obj) {
     for (size_t i = 0; i < obj->points.count; ++i)
         obj->points.items[i].mark = original_point;
 
-    CAD old_object = cad_clone(*obj);
+    CAD* old_object = cad_clone(*obj);
 
     // Face points
     Points face_points = {
@@ -1059,7 +1090,7 @@ CAD* cad_catmull_clark(CAD* obj) {
     IndexPairs original_edges = get_all_edges(*obj);
 
     for (size_t i = 0; i < original_edges.count; ++i) {
-        Indexes adjancent_faces = get_adjancent_face_indexes_to_edge(old_object, original_edges.items[i]);
+        Indexes adjancent_faces = get_adjancent_face_indexes_to_edge(*old_object, original_edges.items[i]);
 
         cad_split_edge(obj, original_edges.items[i]); // edge point gets added at the end of the array
         Vec3 avg = vec3(0, 0, 0);
@@ -1087,11 +1118,11 @@ CAD* cad_catmull_clark(CAD* obj) {
         face_points_avg = vec3_div_s(face_points_avg, touching_face_indexes.count);
 
 
-        IndexPairs touching_edge_indexes = get_all_edges_containing_point(old_object, i);
+        IndexPairs touching_edge_indexes = get_all_edges_containing_point(*old_object, i);
         Vec3 edge_points_avg = vec3(0, 0, 0);
         for (size_t j = 0; j < touching_edge_indexes.count; ++j) {
             IndexPair edge = touching_edge_indexes.items[j];
-            if (edge.first == i) edge_points_avg = vec3_add(edge_points_avg, vec3_avg(old_object.points.items[edge.first], old_object.points.items[edge.second]));
+            if (edge.first == i) edge_points_avg = vec3_add(edge_points_avg, vec3_avg(old_object->points.items[edge.first], old_object->points.items[edge.second]));
         }
         edge_points_avg = vec3_div_s(edge_points_avg, touching_edge_indexes.count);
 
@@ -1372,11 +1403,11 @@ Vec3 cad_get_size(CAD obj) {
     return vec3_sub(b.max, b.min);
 }
 
-CAD cad_curve(Points points) {
-    CAD ret;
-    ret.faces  = (Faces){0};
+CAD* cad_curve(Points points) {
+    CAD* ret = cad_alloc();
+    ret->faces  = (Faces){0};
     // TODO should clone points maybe?
-    ret.points = points;
+    ret->points = points;
     return ret;
 }
 
@@ -1407,13 +1438,13 @@ Face cad_alloc_face(size_t count) {
     return ret;
 }
 
-CAD cad_xy_curve_from_function(val_t (*func)(val_t), val_t from, val_t to, size_t nsteps) {
-    CAD ret;
-    ret.faces  = (Faces){0};
-    ret.points = cad_alloc_points(nsteps+1);
+CAD* cad_xy_curve_from_function(val_t (*func)(val_t), val_t from, val_t to, size_t nsteps) {
+    CAD* ret = cad_alloc();
+    ret->faces  = (Faces){0};
+    ret->points = cad_alloc_points(nsteps+1);
     for (size_t step = 0; step <= nsteps; ++step) {
         val_t x = (to - from)/nsteps*step-to;
-        ret.points.items[step] = vec3(x, func(x), 0);
+        ret->points.items[step] = vec3(x, func(x), 0);
     }
     return ret;
 }
@@ -1609,7 +1640,7 @@ void cad_simple_show(val_t zoom, CAD obj, void (*write_char)(char), void (*debug
     #define CAD_SIMPLE_SHOW_HEIGHT 10
     char screen[CAD_SIMPLE_SHOW_WIDTH*CAD_SIMPLE_SHOW_HEIGHT] = {0};
 
-    CAD tmp = cad_clone(obj);
+    CAD tmp = *cad_clone(obj);
     CAD* temp = &tmp;
     cad_scale_x(temp, 2);
 
@@ -1659,7 +1690,7 @@ void cad_simple_show(val_t zoom, CAD obj, void (*write_char)(char), void (*debug
         }
         write_char('\n');
     }
-    cad_free(tmp);
+    cad_free(temp);
     return;
 
 
@@ -1672,7 +1703,7 @@ void cad_render_to_ascii_screen(ASCII_Screen* screen, val_t zoom, CAD obj) {
     char chars[] = {'.', ':', '-', '=', '+', '*', '#', '%', '@'};
     int chars_count = sizeof(chars) * sizeof(chars[0]);
 
-    CAD temp = cad_clone(obj);
+    CAD temp = *cad_clone(obj);
 
     cad_scale(&temp, vec3(2, 1, 1));
 
