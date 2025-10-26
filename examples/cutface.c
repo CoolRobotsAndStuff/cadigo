@@ -120,7 +120,34 @@ void cut(CAD* c1, CAD cutter_) {
             bool prev_inside = point_inside_face2D(cutter.points.items[i_prev], 0, *c1);
 
             if (prev_inside && next_inside) {
-                puts("a");
+                Segment seg;
+                size_t idx;
+                Vec3 itc;
+
+                seg = segment_from_points2d(cutter.points.items[i_prev], cutter.points.items[i]);
+
+                itc = face_segment_intersection(*c1, 0, seg, &idx);
+                itc.mark = 1;
+
+                da_append(&c1->points, itc);
+                da_insert(&orig_face         , idx, c1->points.count-1);
+                da_insert(&c1->faces.items[0], idx, c1->points.count-1);
+                da_append(&cutter_face, cutter_face_count++);
+
+                seg = segment_from_points2d(cutter.points.items[i], cutter.points.items[i_next]);
+
+                itc = face_segment_intersection(*c1, 0, seg, &idx);
+                itc.mark = 1;
+
+                da_append(&c1->points, itc);
+                da_insert(&orig_face         , idx, c1->points.count-1);
+                da_insert(&c1->faces.items[0], idx, c1->points.count-1);
+                da_append(&cutter_face, cutter_face_count++);
+
+                da_append(&c1->points, cutter.points.items[i_next]);
+                da_append(&cutter_face, cutter_face_count++);
+                i++;
+
             } else if (prev_inside || next_inside) {
                 Segment seg;
                 if (prev_inside) {
@@ -137,7 +164,11 @@ void cut(CAD* c1, CAD cutter_) {
                 da_insert(&orig_face         , idx, c1->points.count-1);
                 da_insert(&c1->faces.items[0], idx, c1->points.count-1);
                 da_append(&cutter_face, cutter_face_count++);
-                if (next_inside) i++;
+                if (next_inside) {
+                    da_append(&c1->points, cutter.points.items[i_next]);
+                    da_append(&cutter_face, cutter_face_count++);
+                    i++;
+                }
             }
 
 
@@ -161,9 +192,9 @@ void cut(CAD* c1, CAD cutter_) {
         }
     }
 
-    //free_face(orig_face);
-    //cad_free(cutter_ptr);
-    //return;
+    // free_face(orig_face);
+    // cad_free(cutter_ptr);
+    // return;
     
     puts("cutter_face:");
     print_face(cutter_face);
@@ -279,6 +310,7 @@ int main() {
     //cad_translate_x(c2, -9);
     while (cad_viz_keep_rendenring(viz)) {
         cad_clone_into(*c1, c3);
+        cad_rotate_in_place_z(c2, 1);
         cad_translate_x(c2, v);
         pos += v;
         if (pos > 15 || pos < -15) v = -v;

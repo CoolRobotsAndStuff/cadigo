@@ -815,6 +815,21 @@ CAD* cad_rotate_in_place_y(CAD* obj, val_t v) {
     return obj;
 }
 
+CAD* cad_rotate_in_place_z(CAD* obj, val_t v) {
+    Vec3 average = vec3(0, 0, 0);
+
+    for (size_t i = 0; i < obj->points.count; ++i) vec3_add_to(&average, obj->points.items[i]);
+    vec3_div_by_s(&average, obj->points.count);
+
+    cad_translate(obj, vec3_mult_s(average, -1));
+    for (size_t i = 0; i < obj->points.count; ++i) {
+        obj->points.items[i] = vec3_rotate_yaw(degs2rads(v),  obj->points.items[i]);
+    }
+    cad_translate(obj, average);
+
+    return obj;
+}
+
 CAD* cad_scale(CAD* obj, Vec3 v) {
     for (size_t i=0; i < obj->points.count; ++i) {
         obj->points.items[i].x *= v.x;
