@@ -15,6 +15,7 @@ typedef struct {
     float camX, camZ, camY;
     unsigned int fps;
     bool show_lines;
+    bool show_vertices;
     float dt;
 } CAD_Viz;
 
@@ -128,6 +129,7 @@ CAD_Viz* cad_viz_init() {
     ret->fps=60;
     ret->dt=1/60;
     ret->show_lines=true;
+    ret->show_vertices=false;
     return ret;
 }
 
@@ -349,6 +351,7 @@ void cad_viz_render(CAD_Viz* ctx, CAD obj) {
         glEnd();
 
         if (ctx->show_lines) {
+            glLineWidth(2);
             glBegin(GL_LINES);
                 for (size_t j = 0; j < face.count; ++j) {
                     Vec3 v1 = obj.points.items[face.items[j]];
@@ -358,6 +361,20 @@ void cad_viz_render(CAD_Viz* ctx, CAD obj) {
                         glVertex3f(v2.x, v2.y, v2.z);
                 }
             glEnd();
+        }
+    
+        if (ctx->show_vertices) {
+            for (size_t i = 0; i < obj.points.count; ++i) {
+                glBegin(GL_TRIANGLES);
+                    Vec3 p = obj.points.items[i]; 
+                    if      (p.mark == 0) glColor3f(1, 0, 0);
+                    else if (p.mark == 1) glColor3f(0, 0, 1);
+                    else                  glColor3f(0, 1, 0);
+                    glVertex3f(p.x, p.y+0.4, p.z);
+                    glVertex3f(p.x, p.y-0.4, p.z);
+                    glVertex3f(p.x+0.4, p.y, p.z);
+                glEnd();
+            }
         }
     }
 }

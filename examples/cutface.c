@@ -304,6 +304,7 @@ int main() {
 
     CAD_Viz* viz = cad_viz_init();
     viz->fps = 60;
+    viz->show_vertices = true;
 
     val_t pos = 0;
     val_t v = 0.1;
