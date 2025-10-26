@@ -104,7 +104,7 @@ typedef struct {
     union { val_t x; ang_t roll;  val_t first; };
     union { val_t y; ang_t pitch; val_t second;};
     union { val_t z; ang_t yaw;   val_t third;};
-    // char mark; // some algorithms are easier if you can just mark certain points
+    char mark; // some algorithms are easier if you can just mark certain points
     // CAD_Color color;
 } Vec3;
 
@@ -1522,8 +1522,8 @@ bool ray_from_point_intersects_edge_2D(Vec3 p, Vec3 edge_a, Vec3 edge_b) {
     // -(m * x) = -(m * a.x) + a.y
     val_t     x = ((m * a.x) - a.y) / m;
 
-    printf("m: %"VAL_FMT"\n", m);
-    printf("x: %"VAL_FMT"\n", x);
+    // printf("m: %"VAL_FMT"\n", m);
+    // printf("x: %"VAL_FMT"\n", x);
 
     if (x < 0) return false;
 
